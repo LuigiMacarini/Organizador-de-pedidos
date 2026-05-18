@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Cliente (deduplicado por nome normalizado em `nameKey`).
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  nameKey   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  notes      String      @default("")
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  lines      OrderLine[]
+
+  @@index([customerId])
+  @@index([updatedAt])
+}
+
+model OrderLine {
+  id        String @id @default(cuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  name      String
+  unitPrice Float
+  qty       Int
+
+  @@index([orderId])
+}

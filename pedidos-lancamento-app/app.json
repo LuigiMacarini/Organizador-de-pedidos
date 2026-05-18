@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Pedidos",
+    "slug": "pedidos-lancamento-app",
+    "scheme": "pedidos-lancamento",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F6FA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.pedidoslancamento"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F4F6FA"
+      },
+      "package": "com.example.pedidoslancamento"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"]
+  }
+}
