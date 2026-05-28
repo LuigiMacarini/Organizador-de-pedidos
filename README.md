@@ -16,7 +16,8 @@ Funcionalidades planejadas para as próximas versões:
 
 💬 Integração com mensageria
 🗺️ Roteirização de pedidos para otimização das entregas
-▶️ Como Executar
+
+## ▶️ Como Executar
 Clone o repositório
 Instale as dependências:
 ```text
