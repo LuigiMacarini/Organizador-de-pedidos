@@ -11,9 +11,9 @@ TypeScript (Frontend e Backend)
 📋 Lançamento de pedidos
 🧾 Geração de recibos por pedido
 📦 Agrupamento de itens para auxiliar nas entregas
-🚀 Roadmap
-Funcionalidades planejadas para as próximas versões:
 
+## 🚀 Roadmap
+Funcionalidades planejadas para as próximas versões:
 💬 Integração com mensageria
 🗺️ Roteirização de pedidos para otimização das entregas
 
