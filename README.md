@@ -17,3 +17,12 @@ Funcionalidades planejadas para as próximas versões:
 💬 Integração com mensageria
 🗺️ Roteirização de pedidos para otimização das entregas
 ▶️ Como Executar
+Clone o repositório
+Instale as dependências:
+```text
+npm install
+```
+Inicie o projeto:
+```text
+npx expo start
+```
