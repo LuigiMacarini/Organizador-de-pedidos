@@ -58,7 +58,10 @@ export function OrdersProvider({ children }: { children: React.ReactNode }) {
     async (input: Omit<Order, "id" | "createdAt" | "updatedAt">) => {
       const base = getApiBaseUrl();
       if (base) {
-        const created = await remoteCreateOrder(base, input);
+        const remote = await remoteCreateOrder(base, input);
+        // O servidor atual não persiste `customerId`; mantemos o vínculo
+        // escolhido em memória para o agrupamento funcionar na sessão.
+        const created = { ...remote, customerId: input.customerId ?? remote.customerId };
         setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
         return created;
       }
@@ -82,7 +85,8 @@ export function OrdersProvider({ children }: { children: React.ReactNode }) {
   const updateOrder = useCallback(async (order: Order) => {
     const base = getApiBaseUrl();
     if (base) {
-      const updated = await remoteUpdateOrder(base, order);
+      const remote = await remoteUpdateOrder(base, order);
+      const updated = { ...remote, customerId: order.customerId ?? remote.customerId };
       setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
       return;
     }

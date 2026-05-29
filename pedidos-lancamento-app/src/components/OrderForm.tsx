@@ -13,6 +13,7 @@ import type { LineItem, Order, Product } from "../types";
 import { searchCatalogSections } from "../catalog";
 import { colors, radii, space } from "../theme";
 import { Accordion } from "./Accordion";
+import { CustomerSelect } from "./CustomerSelect";
 import { FieldLabel } from "./FieldLabel";
 import { PrimaryButton } from "./PrimaryButton";
 
@@ -21,9 +22,12 @@ function formatBRL(value: number) {
 }
 
 type Props = {
-  initial?: Partial<Pick<Order, "customerName" | "items" | "notes">> & { id?: string };
+  initial?: Partial<Pick<Order, "customerId" | "customerName" | "items" | "notes">> & {
+    id?: string;
+  };
   submitLabel: string;
   onSubmit: (payload: {
+    customerId?: string;
     customerName: string;
     items: LineItem[];
     notes: string;
@@ -45,6 +49,7 @@ export function OrderForm({
   onDelete,
   busy,
 }: Props) {
+  const [customerId, setCustomerId] = useState<string | undefined>(initial?.customerId);
   const [customerName, setCustomerName] = useState(initial?.customerName ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [query, setQuery] = useState("");
@@ -120,15 +125,15 @@ export function OrderForm({
   const handleSubmit = useCallback(async () => {
     const name = customerName.trim();
     if (!name) {
-      Alert.alert("Cliente", "Informe o nome do cliente.");
+      Alert.alert("Cliente", "Selecione um cliente para o pedido.");
       return;
     }
     if (items.length === 0) {
       Alert.alert("Produtos", "Adicione ao menos um produto ao pedido.");
       return;
     }
-    await onSubmit({ customerName: name, items, notes: notes.trim() });
-  }, [customerName, items, notes, onSubmit]);
+    await onSubmit({ customerId, customerName: name, items, notes: notes.trim() });
+  }, [customerId, customerName, items, notes, onSubmit]);
 
   const handleDelete = useCallback(() => {
     if (!onDelete) return;
@@ -154,14 +159,13 @@ export function OrderForm({
     >
       <View style={styles.card}>
         <FieldLabel>Cliente</FieldLabel>
-        <TextInput
-          value={customerName}
-          onChangeText={setCustomerName}
-          placeholder="Nome do cliente"
-          placeholderTextColor={colors.muted}
-          style={styles.input}
-          autoCapitalize="words"
-          returnKeyType="next"
+        <CustomerSelect
+          customerId={customerId}
+          customerName={customerName}
+          onSelect={({ id, name }) => {
+            setCustomerId(id);
+            setCustomerName(name);
+          }}
         />
       </View>
 

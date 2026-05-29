@@ -40,6 +40,7 @@ export default function PedidoDetalheScreen() {
             key={order.updatedAt}
             initial={{
               id: order.id,
+              customerId: order.customerId,
               customerName: order.customerName,
               items: order.items,
               notes: order.notes,
@@ -51,6 +52,7 @@ export default function PedidoDetalheScreen() {
               try {
                 await updateOrder({
                   ...order,
+                  customerId: payload.customerId,
                   customerName: payload.customerName,
                   items: payload.items,
                   notes: payload.notes,
