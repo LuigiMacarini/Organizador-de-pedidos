@@ -22,6 +22,7 @@ export default function NovoPedidoScreen() {
               setBusy(true);
               try {
                 await createOrder({
+                  customerId: payload.customerId,
                   customerName: payload.customerName,
                   items: payload.items,
                   notes: payload.notes,

@@ -15,9 +15,22 @@ export type LineItem = {
 
 export type Order = {
   id: string;
+  /** Vínculo opcional ao cliente cadastrado (local). Pode faltar em pedidos antigos/modo remoto. */
+  customerId?: string;
   customerName: string;
   items: LineItem[];
   notes: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type Customer = {
+  id: string;
+  name: string;
+  /** Telefone ou WhatsApp */
+  contact?: string;
+  /** Observação livre para identificação */
+  note?: string;
   createdAt: number;
   updatedAt: number;
 };
