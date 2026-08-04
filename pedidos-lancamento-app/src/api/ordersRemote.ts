@@ -1,64 +1,36 @@
-import type { LineItem, Order } from "../types";
+import { apiRequest } from "./httpClient";
+import type { Order } from "../types";
 
-function joinUrl(base: string, path: string) {
-  return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+export type OrderLineInput = { productId: string; qty: number };
+
+export type CreateOrderInput = {
+  customerId: string;
+  items: OrderLineInput[];
+  notes?: string;
+};
+
+export type UpdateOrderInput = Partial<CreateOrderInput>;
+
+type Page<T> = { items: T[]; nextCursor: string | null };
+
+/** Ver nota em `customersRemote.ts` sobre o limite de página único. */
+export async function remoteListOrders(status: "pending" | "archived" | "all" = "pending"): Promise<Order[]> {
+  const page = await apiRequest<Page<Order>>(`/v1/orders?status=${status}&limit=200`);
+  return page.items;
 }
 
-async function readError(res: Response): Promise<string> {
-  try {
-    const t = await res.text();
-    if (!t) return res.statusText;
-    try {
-      const j = JSON.parse(t) as { error?: string };
-      return j.error ?? t;
-    } catch {
-      return t;
-    }
-  } catch {
-    return res.statusText;
-  }
+export function remoteCreateOrder(input: CreateOrderInput): Promise<Order> {
+  return apiRequest<Order>("/v1/orders", { method: "POST", body: input });
 }
 
-export async function remoteListOrders(baseUrl: string): Promise<Order[]> {
-  const res = await fetch(joinUrl(baseUrl, "/v1/orders"));
-  if (!res.ok) throw new Error(await readError(res));
-  return (await res.json()) as Order[];
+export function remoteUpdateOrder(id: string, input: UpdateOrderInput): Promise<Order> {
+  return apiRequest<Order>(`/v1/orders/${id}`, { method: "PATCH", body: input });
 }
 
-export async function remoteCreateOrder(
-  baseUrl: string,
-  input: Omit<Order, "id" | "createdAt" | "updatedAt">
-): Promise<Order> {
-  const res = await fetch(joinUrl(baseUrl, "/v1/orders"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      customerName: input.customerName,
-      notes: input.notes ?? "",
-      items: input.items as LineItem[],
-    }),
-  });
-  if (!res.ok) throw new Error(await readError(res));
-  return (await res.json()) as Order;
+export function remoteArchiveOrder(id: string): Promise<Order> {
+  return apiRequest<Order>(`/v1/orders/${id}/archive`, { method: "POST" });
 }
 
-export async function remoteUpdateOrder(baseUrl: string, order: Order): Promise<Order> {
-  const res = await fetch(joinUrl(baseUrl, `/v1/orders/${order.id}`), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      customerName: order.customerName,
-      notes: order.notes,
-      items: order.items,
-    }),
-  });
-  if (!res.ok) throw new Error(await readError(res));
-  return (await res.json()) as Order;
-}
-
-export async function remoteDeleteOrder(baseUrl: string, id: string): Promise<void> {
-  const res = await fetch(joinUrl(baseUrl, `/v1/orders/${id}`), {
-    method: "DELETE",
-  });
-  if (!res.ok && res.status !== 404) throw new Error(await readError(res));
+export function remoteUnarchiveOrder(id: string): Promise<Order> {
+  return apiRequest<Order>(`/v1/orders/${id}/unarchive`, { method: "POST" });
 }

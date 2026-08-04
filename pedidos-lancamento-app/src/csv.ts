@@ -1,6 +1,6 @@
 export type CsvCustomerRow = {
   name: string;
-  contact?: string;
+  phone?: string;
 };
 
 export type CsvParseResult = {
@@ -76,8 +76,8 @@ export function parseCustomersCsv(content: string): CsvParseResult {
       skipped += 1;
       continue;
     }
-    const contact = (cells[1] ?? "").trim();
-    rows.push({ name, contact: contact || undefined });
+    const phone = (cells[1] ?? "").trim();
+    rows.push({ name, phone: phone || undefined });
   }
 
   return { rows, skipped };

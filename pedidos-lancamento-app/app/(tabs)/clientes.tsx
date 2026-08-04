@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SearchBar } from "../../src/components/SearchBar";
+import { useAuth } from "../../src/auth/authContext";
 import { useCustomers } from "../../src/customersContext";
 import { useOrders } from "../../src/ordersContext";
 import { colors, radii, space } from "../../src/theme";
 
 export default function ClientesScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const { customers, loading } = useCustomers();
   const { orders } = useOrders();
   const [query, setQuery] = useState("");
@@ -24,7 +26,6 @@ export default function ClientesScreen() {
   const orderCountByCustomer = useMemo(() => {
     const map = new Map<string, number>();
     for (const o of orders) {
-      if (!o.customerId) continue;
       map.set(o.customerId, (map.get(o.customerId) ?? 0) + 1);
     }
     return map;
@@ -41,8 +42,15 @@ export default function ClientesScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Clientes</Text>
-          <Text style={styles.subtitle}>Cadastro local</Text>
+          <Text style={styles.subtitle}>{customers.length} cadastrados</Text>
         </View>
+        <Pressable
+          onPress={() => void logout()}
+          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
+          accessibilityLabel="Sair"
+        >
+          <Ionicons name="log-out-outline" size={20} color={colors.muted} />
+        </Pressable>
         <Pressable
           onPress={() => router.push("/clientes/importar")}
           style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
@@ -98,9 +106,9 @@ export default function ClientesScreen() {
                   <Text style={styles.name} numberOfLines={1}>
                     {c.name}
                   </Text>
-                  {c.contact?.trim() ? (
+                  {c.phone?.trim() ? (
                     <Text style={styles.contact} numberOfLines={1}>
-                      {c.contact.trim()}
+                      {c.phone.trim()}
                     </Text>
                   ) : null}
                   {c.note?.trim() ? (

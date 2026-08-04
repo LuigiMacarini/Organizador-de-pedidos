@@ -11,16 +11,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SearchBar } from "../../src/components/SearchBar";
+import { getOrderTotal, getOrderUnits } from "../../src/domain/order";
 import { useOrders } from "../../src/ordersContext";
 import { colors, radii, space } from "../../src/theme";
+import { formatBRL } from "../../src/utils/format";
 import type { Order } from "../../src/types";
 
-function formatBRL(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
 type Group = {
-  key: string;
+  customerId: string;
   customerName: string;
   orders: Order[];
   total: number;
@@ -29,14 +27,13 @@ type Group = {
 function groupByCustomer(orders: Order[]): Group[] {
   const map = new Map<string, Group>();
   for (const o of orders) {
-    const key = o.customerId ?? `name:${o.customerName.trim().toLowerCase()}`;
-    let group = map.get(key);
+    let group = map.get(o.customerId);
     if (!group) {
-      group = { key, customerName: o.customerName, orders: [], total: 0 };
-      map.set(key, group);
+      group = { customerId: o.customerId, customerName: o.customerName, orders: [], total: 0 };
+      map.set(o.customerId, group);
     }
     group.orders.push(o);
-    group.total += o.items.reduce((acc, l) => acc + l.unitPrice * l.qty, 0);
+    group.total += getOrderTotal(o.items);
   }
   return [...map.values()].sort((a, b) =>
     a.customerName.localeCompare(b.customerName, "pt-BR", { sensitivity: "base" })
@@ -66,13 +63,13 @@ export default function PedidosScreen() {
         <Pressable
           onPress={() => router.push("/fechar-mes")}
           style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
-          accessibilityLabel="Fechar mês"
+          accessibilityLabel="Arquivar pedidos do mês"
         >
-          <Ionicons name="trash-bin-outline" size={20} color={colors.danger} />
+          <Ionicons name="archive-outline" size={20} color={colors.muted} />
         </Pressable>
         <Pressable
           onPress={() => router.push("/novo")}
-          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
         >
           <Text style={styles.ctaText}>+ Novo</Text>
         </Pressable>
@@ -109,7 +106,7 @@ export default function PedidosScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
           {groups.map((g) => (
-            <View key={g.key} style={styles.group}>
+            <View key={g.customerId} style={styles.group}>
               <View style={styles.groupHeader}>
                 <Text style={styles.groupName} numberOfLines={1}>
                   {g.customerName}
@@ -120,13 +117,13 @@ export default function PedidosScreen() {
                 </Text>
               </View>
               {g.orders.map((o) => {
-                const units = o.items.reduce((acc, l) => acc + l.qty, 0);
-                const total = o.items.reduce((acc, l) => acc + l.unitPrice * l.qty, 0);
+                const units = getOrderUnits(o.items);
+                const total = getOrderTotal(o.items);
                 return (
                   <Pressable
                     key={o.id}
                     onPress={() => router.push(`/pedido/${o.id}`)}
-                    style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.995 }] }]}
+                    style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
                   >
                     <View style={styles.cardTop}>
                       <Text style={styles.badge}>
@@ -180,7 +177,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 44,
     height: 44,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     minHeight: 44,
     justifyContent: "center",
   },
@@ -219,7 +216,7 @@ const styles = StyleSheet.create({
   ctaWide: {
     marginTop: space.sm,
     backgroundColor: colors.primary,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     paddingVertical: space.md,
     alignItems: "center",
   },
@@ -244,7 +241,7 @@ const styles = StyleSheet.create({
   groupMeta: { fontSize: 13, color: colors.muted, fontWeight: "600" },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     padding: space.lg,
     borderWidth: 1,
     borderColor: colors.border,

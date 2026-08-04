@@ -4,11 +4,12 @@ import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CustomerForm } from "../../src/components/CustomerForm";
 import { useCustomers } from "../../src/customersContext";
+import { ApiError } from "../../src/api/httpClient";
 import { colors } from "../../src/theme";
 
 export default function NovoClienteScreen() {
   const router = useRouter();
-  const { createCustomer, findByName } = useCustomers();
+  const { createCustomer } = useCustomers();
   const [busy, setBusy] = useState(false);
 
   return (
@@ -20,12 +21,10 @@ export default function NovoClienteScreen() {
           onSubmit={async (payload) => {
             setBusy(true);
             try {
-              if (findByName(payload.name)) {
-                Alert.alert("Cliente", "Já existe um cliente com esse nome.");
-                return;
-              }
               await createCustomer(payload);
               router.back();
+            } catch (e) {
+              Alert.alert("Cliente", e instanceof ApiError ? e.message : "Não foi possível salvar.");
             } finally {
               setBusy(false);
             }

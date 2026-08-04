@@ -3,8 +3,38 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// Papéis de acesso. CUSTOMER e DELIVERER ainda não têm app/rotas próprios —
+/// reservados agora para não exigir migração quando esses apps forem criados.
+enum Role {
+  OWNER
+  EMPLOYEE
+  CUSTOMER
+  DELIVERER
+}
+
+/// PENDING e ARCHIVED já são usados (lançamento normal / "fechar mês").
+/// RELEASED, DELIVERED e CANCELED pertencem ao fluxo futuro de Remessa +
+/// app do Entregador — reservados no enum, sem lógica associada ainda.
+enum OrderStatus {
+  PENDING
+  ARCHIVED
+  RELEASED
+  DELIVERED
+  CANCELED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(EMPLOYEE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 /// Cliente (deduplicado por nome normalizado em `nameKey`).
@@ -12,32 +42,66 @@ model Customer {
   id        String   @id @default(cuid())
   name      String
   nameKey   String   @unique
+  /// Telefone ou WhatsApp.
+  phone     String   @default("")
+  /// Preparado para o app do Cliente; não usado pelo painel do Dono ainda.
+  address   String?
+  note      String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
+
+  @@index([updatedAt])
+}
+
+/// Catálogo administrável (substitui a lista fixa que vivia no bundle do app).
+model Product {
+  id        String      @id @default(cuid())
+  name      String
+  category  String
+  unitPrice Float
+  sku       String?
+  /// Soft-delete: produtos descontinuados somem da lista sem quebrar
+  /// o histórico de pedidos que já os referenciam.
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  lines     OrderLine[]
+
+  @@index([category])
+  @@index([active])
 }
 
 model Order {
   id         String      @id @default(cuid())
   customerId String
-  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
   notes      String      @default("")
+  status     OrderStatus @default(PENDING)
+  /// Preparado para a fase de Remessas; sem tabela `Shipment` ainda.
+  shipmentId String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   lines      OrderLine[]
 
   @@index([customerId])
   @@index([updatedAt])
+  @@index([status])
+  @@index([shipmentId])
 }
 
 model OrderLine {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
-  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
+  product   Product @relation(fields: [productId], references: [id])
+  /// Nome e preço são um snapshot no momento do pedido — não seguem edições
+  /// futuras do produto, para não reescrever pedidos antigos.
   name      String
   unitPrice Float
   qty       Int
 
   @@index([orderId])
+  @@index([productId])
 }

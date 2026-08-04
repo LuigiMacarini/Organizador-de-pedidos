@@ -128,7 +128,7 @@ export default function ImportarClientesScreen() {
                     {r.name}
                   </Text>
                   <Text style={[styles.td, { flex: 1 }]} numberOfLines={1}>
-                    {r.contact ?? "—"}
+                    {r.phone ?? "—"}
                   </Text>
                 </View>
               ))}
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderRadius: radii.md,
     paddingVertical: space.md,
-    backgroundColor: colors.chipBg,
+    backgroundColor: colors.surface,
   },
   pickText: { color: colors.primary, fontWeight: "800", fontSize: 15 },
   fileName: { marginTop: space.sm, color: colors.muted, fontSize: 13, textAlign: "center" },

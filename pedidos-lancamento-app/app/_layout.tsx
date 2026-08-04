@@ -1,25 +1,45 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AuthProvider, useAuth } from "../src/auth/authContext";
 import { CustomersProvider } from "../src/customersContext";
 import { OrdersProvider } from "../src/ordersContext";
+import { ProductsProvider } from "../src/productsContext";
 import { colors } from "../src/theme";
 
-export default function RootLayout() {
+const screenOptions = {
+  headerShadowVisible: false,
+  headerStyle: { backgroundColor: colors.bg },
+  headerTitleStyle: { fontWeight: "700" as const, color: colors.text },
+  headerTintColor: colors.text,
+  contentStyle: { backgroundColor: colors.bg },
+};
+
+function AppShell() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+      </Stack>
+    );
+  }
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <CustomersProvider>
+    <CustomersProvider>
+      <ProductsProvider>
         <OrdersProvider>
-          <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerShadowVisible: false,
-              headerStyle: { backgroundColor: colors.bg },
-              headerTitleStyle: { fontWeight: "700", color: colors.text },
-              headerTintColor: colors.text,
-              contentStyle: { backgroundColor: colors.bg },
-            }}
-          >
+          <Stack screenOptions={screenOptions}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="novo" options={{ title: "Novo pedido" }} />
             <Stack.Screen name="pedido/[id]" options={{ title: "Pedido" }} />
@@ -29,7 +49,18 @@ export default function RootLayout() {
             <Stack.Screen name="fechar-mes" options={{ title: "Fechar mês" }} />
           </Stack>
         </OrdersProvider>
-      </CustomersProvider>
+      </ProductsProvider>
+    </CustomersProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <StatusBar style="dark" />
+        <AppShell />
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }
