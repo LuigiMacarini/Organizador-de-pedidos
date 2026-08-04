@@ -1,9 +1,19 @@
+export type Role = "OWNER" | "EMPLOYEE" | "CUSTOMER" | "DELIVERER";
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+};
+
 export type Product = {
   id: string;
   name: string;
+  category: string;
   unitPrice: number;
-  /** Opcional — usado em busca e exibição quando existir */
-  sku?: string;
+  sku?: string | null;
+  active: boolean;
 };
 
 export type LineItem = {
@@ -13,13 +23,16 @@ export type LineItem = {
   qty: number;
 };
 
+/** Pedidos ativos usam PENDING/ARCHIVED. Os demais pertencem ao fluxo futuro de Remessa/Entrega. */
+export type OrderStatus = "PENDING" | "ARCHIVED" | "RELEASED" | "DELIVERED" | "CANCELED";
+
 export type Order = {
   id: string;
-  /** Vínculo opcional ao cliente cadastrado (local). Pode faltar em pedidos antigos/modo remoto. */
-  customerId?: string;
+  customerId: string;
   customerName: string;
   items: LineItem[];
   notes: string;
+  status: OrderStatus;
   createdAt: number;
   updatedAt: number;
 };
@@ -27,10 +40,11 @@ export type Order = {
 export type Customer = {
   id: string;
   name: string;
-  /** Telefone ou WhatsApp */
-  contact?: string;
-  /** Observação livre para identificação */
-  note?: string;
+  /** Telefone ou WhatsApp. */
+  phone: string;
+  address?: string | null;
+  note: string;
+  orderCount?: number;
   createdAt: number;
   updatedAt: number;
 };

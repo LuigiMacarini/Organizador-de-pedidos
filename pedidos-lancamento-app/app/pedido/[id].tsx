@@ -1,33 +1,33 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { OrderForm } from "../../src/components/OrderForm";
+import { toOrderLineInputs } from "../../src/domain/order";
 import { useOrders } from "../../src/ordersContext";
+import { ApiError } from "../../src/api/httpClient";
 import { colors, space } from "../../src/theme";
 
 export default function PedidoDetalheScreen() {
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const router = useRouter();
-  const { orders, updateOrder, deleteOrder } = useOrders();
+  const { orders, updateOrder, archiveOrder } = useOrders();
   const [busy, setBusy] = useState(false);
 
   const order = useMemo(() => orders.find((o) => o.id === id), [orders, id]);
 
   if (!order) {
     return (
-      <>
-        <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
-          <View style={styles.missing}>
-            <Text style={styles.missingTitle}>Pedido não encontrado</Text>
-            <Text style={styles.missingText}>Ele pode ter sido excluído neste aparelho.</Text>
-            <Pressable onPress={() => router.replace("/")} accessibilityRole="link">
-              <Text style={styles.link}>Voltar para a lista</Text>
-            </Pressable>
-          </View>
-        </SafeAreaView>
-      </>
+      <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+        <View style={styles.missing}>
+          <Text style={styles.missingTitle}>Pedido não encontrado</Text>
+          <Text style={styles.missingText}>Ele pode ter sido arquivado ou excluído.</Text>
+          <Pressable onPress={() => router.replace("/")} accessibilityRole="link">
+            <Text style={styles.link}>Voltar para a lista</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -39,7 +39,6 @@ export default function PedidoDetalheScreen() {
           <OrderForm
             key={order.updatedAt}
             initial={{
-              id: order.id,
               customerId: order.customerId,
               customerName: order.customerName,
               items: order.items,
@@ -50,23 +49,25 @@ export default function PedidoDetalheScreen() {
             onSubmit={async (payload) => {
               setBusy(true);
               try {
-                await updateOrder({
-                  ...order,
+                await updateOrder(order.id, {
                   customerId: payload.customerId,
-                  customerName: payload.customerName,
-                  items: payload.items,
+                  items: toOrderLineInputs(payload.items),
                   notes: payload.notes,
                 });
                 router.back();
+              } catch (e) {
+                Alert.alert("Pedido", e instanceof ApiError ? e.message : "Não foi possível salvar.");
               } finally {
                 setBusy(false);
               }
             }}
-            onDelete={async () => {
+            onArchive={async () => {
               setBusy(true);
               try {
-                await deleteOrder(order.id);
+                await archiveOrder(order.id);
                 router.replace("/");
+              } catch (e) {
+                Alert.alert("Pedido", e instanceof ApiError ? e.message : "Não foi possível arquivar.");
               } finally {
                 setBusy(false);
               }

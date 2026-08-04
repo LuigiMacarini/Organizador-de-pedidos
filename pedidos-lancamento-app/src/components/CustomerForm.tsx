@@ -13,16 +13,16 @@ import { FieldLabel } from "./FieldLabel";
 import { PrimaryButton } from "./PrimaryButton";
 
 type Props = {
-  initial?: Partial<Pick<Customer, "name" | "contact" | "note">>;
+  initial?: Partial<Pick<Customer, "name" | "phone" | "note">>;
   submitLabel: string;
-  onSubmit: (payload: { name: string; contact: string; note: string }) => Promise<void> | void;
+  onSubmit: (payload: { name: string; phone: string; note: string }) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   busy?: boolean;
 };
 
 export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [contact, setContact] = useState(initial?.contact ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
   const [note, setNote] = useState(initial?.note ?? "");
 
   const handleSubmit = useCallback(async () => {
@@ -31,8 +31,8 @@ export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }:
       Alert.alert("Cliente", "Informe o nome do cliente.");
       return;
     }
-    await onSubmit({ name: trimmed, contact: contact.trim(), note: note.trim() });
-  }, [name, contact, note, onSubmit]);
+    await onSubmit({ name: trimmed, phone: phone.trim(), note: note.trim() });
+  }, [name, phone, note, onSubmit]);
 
   const handleDelete = useCallback(() => {
     if (!onDelete) return;
@@ -70,10 +70,10 @@ export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }:
       </View>
 
       <View style={styles.card}>
-        <FieldLabel optional>Contato</FieldLabel>
+        <FieldLabel optional>Telefone</FieldLabel>
         <TextInput
-          value={contact}
-          onChangeText={setContact}
+          value={phone}
+          onChangeText={setPhone}
           placeholder="Telefone ou WhatsApp"
           placeholderTextColor={colors.muted}
           style={styles.input}
@@ -125,15 +125,10 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     padding: space.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
   },
   input: {
     borderWidth: 1,
@@ -143,7 +138,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     fontSize: 16,
     color: colors.text,
-    backgroundColor: "#FAFBFF",
+    backgroundColor: colors.surface,
   },
   textarea: {
     minHeight: 96,

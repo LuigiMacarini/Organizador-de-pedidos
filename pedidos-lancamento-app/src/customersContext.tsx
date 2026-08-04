@@ -6,8 +6,12 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { loadCustomers, saveCustomers } from "./customersStorage";
-import { makeId } from "./storage";
+import {
+  remoteCreateCustomer,
+  remoteDeleteCustomer,
+  remoteListCustomers,
+  remoteUpdateCustomer,
+} from "./api/customersRemote";
 import type { Customer } from "./types";
 
 export function normalizeName(name: string): string {
@@ -16,7 +20,8 @@ export function normalizeName(name: string): string {
 
 export type CustomerInput = {
   name: string;
-  contact?: string;
+  phone?: string;
+  address?: string;
   note?: string;
 };
 
@@ -30,8 +35,9 @@ type CustomersContextValue = {
   loading: boolean;
   refresh: () => Promise<void>;
   createCustomer: (input: CustomerInput) => Promise<Customer>;
-  updateCustomer: (customer: Customer) => Promise<void>;
+  updateCustomer: (id: string, input: CustomerInput) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
+  /** Importação CSV: tenta criar cada linha; duplicados/erros contam como "skipped". */
   importCustomers: (rows: CustomerInput[]) => Promise<ImportResult>;
   findByName: (name: string) => Customer | undefined;
 };
@@ -45,7 +51,7 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setCustomers(await loadCustomers());
+      setCustomers(await remoteListCustomers());
     } catch (e) {
       console.error(e);
       setCustomers([]);
@@ -59,80 +65,42 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const createCustomer = useCallback(async (input: CustomerInput) => {
-    const now = Date.now();
-    const customer: Customer = {
-      id: makeId(),
-      name: input.name.trim(),
-      contact: input.contact?.trim() || undefined,
-      note: input.note?.trim() || undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setCustomers((prev) => {
-      const next = [...prev, customer];
-      void saveCustomers(next);
-      return next;
-    });
-    return customer;
+    const created = await remoteCreateCustomer(input);
+    setCustomers((prev) => [created, ...prev]);
+    return created;
   }, []);
 
-  const updateCustomer = useCallback(async (customer: Customer) => {
-    const updated: Customer = {
-      ...customer,
-      name: customer.name.trim(),
-      contact: customer.contact?.trim() || undefined,
-      note: customer.note?.trim() || undefined,
-      updatedAt: Date.now(),
-    };
-    setCustomers((prev) => {
-      const next = prev.map((c) => (c.id === updated.id ? updated : c));
-      void saveCustomers(next);
-      return next;
-    });
+  const updateCustomer = useCallback(async (id: string, input: CustomerInput) => {
+    const updated = await remoteUpdateCustomer(id, input);
+    setCustomers((prev) => prev.map((c) => (c.id === id ? updated : c)));
   }, []);
 
   const deleteCustomer = useCallback(async (id: string) => {
-    setCustomers((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      void saveCustomers(next);
-      return next;
-    });
+    await remoteDeleteCustomer(id);
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
   const importCustomers = useCallback(async (rows: CustomerInput[]) => {
     let imported = 0;
     let skipped = 0;
-    setCustomers((prev) => {
-      const seen = new Set(prev.map((c) => normalizeName(c.name)));
-      const now = Date.now();
-      const additions: Customer[] = [];
-      for (const row of rows) {
-        const name = row.name?.trim();
-        if (!name) {
-          skipped += 1;
-          continue;
-        }
-        const key = normalizeName(name);
-        if (seen.has(key)) {
-          skipped += 1;
-          continue;
-        }
-        seen.add(key);
-        additions.push({
-          id: makeId(),
-          name,
-          contact: row.contact?.trim() || undefined,
-          note: row.note?.trim() || undefined,
-          createdAt: now,
-          updatedAt: now,
-        });
-        imported += 1;
+    const created: Customer[] = [];
+    for (const row of rows) {
+      const name = row.name?.trim();
+      if (!name) {
+        skipped += 1;
+        continue;
       }
-      if (additions.length === 0) return prev;
-      const next = [...prev, ...additions];
-      void saveCustomers(next);
-      return next;
-    });
+      try {
+        created.push(await remoteCreateCustomer({ ...row, name }));
+        imported += 1;
+      } catch {
+        // Nome duplicado (409) ou outro erro pontual: conta como ignorado e segue a importação.
+        skipped += 1;
+      }
+    }
+    if (created.length > 0) {
+      setCustomers((prev) => [...created, ...prev]);
+    }
     return { imported, skipped };
   }, []);
 

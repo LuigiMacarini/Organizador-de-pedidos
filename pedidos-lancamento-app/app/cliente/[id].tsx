@@ -3,7 +3,8 @@ import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CustomerForm } from "../../src/components/CustomerForm";
-import { normalizeName, useCustomers } from "../../src/customersContext";
+import { useCustomers } from "../../src/customersContext";
+import { ApiError } from "../../src/api/httpClient";
 import { colors, space } from "../../src/theme";
 
 export default function ClienteDetalheScreen() {
@@ -20,7 +21,7 @@ export default function ClienteDetalheScreen() {
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
         <View style={styles.missing}>
           <Text style={styles.missingTitle}>Cliente não encontrado</Text>
-          <Text style={styles.missingText}>Ele pode ter sido excluído neste aparelho.</Text>
+          <Text style={styles.missingText}>Ele pode ter sido excluído.</Text>
           <Pressable onPress={() => router.back()} accessibilityRole="link">
             <Text style={styles.link}>Voltar</Text>
           </Pressable>
@@ -38,7 +39,7 @@ export default function ClienteDetalheScreen() {
             key={customer.updatedAt}
             initial={{
               name: customer.name,
-              contact: customer.contact,
+              phone: customer.phone,
               note: customer.note,
             }}
             submitLabel="Salvar alterações"
@@ -46,20 +47,10 @@ export default function ClienteDetalheScreen() {
             onSubmit={async (payload) => {
               setBusy(true);
               try {
-                const dup = customers.find(
-                  (c) => c.id !== customer.id && normalizeName(c.name) === normalizeName(payload.name)
-                );
-                if (dup) {
-                  Alert.alert("Cliente", "Já existe um cliente com esse nome.");
-                  return;
-                }
-                await updateCustomer({
-                  ...customer,
-                  name: payload.name,
-                  contact: payload.contact,
-                  note: payload.note,
-                });
+                await updateCustomer(customer.id, payload);
                 router.back();
+              } catch (e) {
+                Alert.alert("Cliente", e instanceof ApiError ? e.message : "Não foi possível salvar.");
               } finally {
                 setBusy(false);
               }
@@ -69,6 +60,8 @@ export default function ClienteDetalheScreen() {
               try {
                 await deleteCustomer(customer.id);
                 router.back();
+              } catch (e) {
+                Alert.alert("Cliente", e instanceof ApiError ? e.message : "Não foi possível excluir.");
               } finally {
                 setBusy(false);
               }

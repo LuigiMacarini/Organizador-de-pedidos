@@ -1,22 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PrimaryButton } from "../src/components/PrimaryButton";
+import { getOrderTotal } from "../src/domain/order";
 import { useOrders } from "../src/ordersContext";
 import { colors, radii, space } from "../src/theme";
-
-function formatBRL(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
+import { formatBRL } from "../src/utils/format";
 
 function isSameMonth(ts: number, ref: Date) {
   const d = new Date(ts);
@@ -25,7 +16,7 @@ function isSameMonth(ts: number, ref: Date) {
 
 export default function FecharMesScreen() {
   const router = useRouter();
-  const { orders, deleteOrder } = useOrders();
+  const { orders, archiveOrder } = useOrders();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,15 +59,14 @@ export default function FecharMesScreen() {
     let grandTotal = 0;
     for (const o of monthOrders) {
       if (!selected.has(o.id)) continue;
-      const key = o.customerId ?? `name:${o.customerName.trim().toLowerCase()}`;
-      const total = o.items.reduce((acc, l) => acc + l.unitPrice * l.qty, 0);
+      const total = getOrderTotal(o.items);
       grandTotal += total;
-      const row = map.get(key);
+      const row = map.get(o.customerId);
       if (row) {
         row.count += 1;
         row.total += total;
       } else {
-        map.set(key, { name: o.customerName, count: 1, total });
+        map.set(o.customerId, { name: o.customerName, count: 1, total });
       }
     }
     const rows = [...map.values()].sort((a, b) =>
@@ -90,7 +80,7 @@ export default function FecharMesScreen() {
     try {
       const ids = [...selected];
       for (const id of ids) {
-        await deleteOrder(id);
+        await archiveOrder(id);
       }
       setConfirmOpen(false);
       router.back();
@@ -105,7 +95,8 @@ export default function FecharMesScreen() {
         <View style={styles.card}>
           <Text style={styles.title}>Fechar mês</Text>
           <Text style={styles.subtitle}>
-            Pedidos de {monthLabel}. Os clientes cadastrados não são removidos.
+            Pedidos de {monthLabel}. Eles saem da lista ativa mas continuam no histórico —
+            nada é apagado.
           </Text>
         </View>
 
@@ -148,7 +139,7 @@ export default function FecharMesScreen() {
               <Text style={styles.sectionTitle}>Pedidos</Text>
               {monthOrders.map((o) => {
                 const checked = selected.has(o.id);
-                const total = o.items.reduce((acc, l) => acc + l.unitPrice * l.qty, 0);
+                const total = getOrderTotal(o.items);
                 return (
                   <Pressable
                     key={o.id}
@@ -174,7 +165,7 @@ export default function FecharMesScreen() {
             </View>
 
             <PrimaryButton
-              title={`Limpar ${selected.size} ${selected.size === 1 ? "pedido" : "pedidos"}`}
+              title={`Arquivar ${selected.size} ${selected.size === 1 ? "pedido" : "pedidos"}`}
               variant="danger"
               onPress={() => setConfirmOpen(true)}
               disabled={selected.size === 0 || busy}
@@ -186,11 +177,11 @@ export default function FecharMesScreen() {
       <Modal visible={confirmOpen} transparent animationType="fade" onRequestClose={() => setConfirmOpen(false)}>
         <View style={styles.backdrop}>
           <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>Confirmar limpeza</Text>
+            <Text style={styles.dialogTitle}>Confirmar arquivamento</Text>
             <Text style={styles.dialogText}>
-              {selected.size} {selected.size === 1 ? "pedido será removido" : "pedidos serão removidos"}{" "}
-              ({formatBRL(summary.grandTotal)}). Os clientes serão mantidos. Esta ação não pode ser
-              desfeita.
+              {selected.size} {selected.size === 1 ? "pedido sai" : "pedidos saem"} da lista ativa
+              ({formatBRL(summary.grandTotal)}). Eles continuam no histórico e podem ser
+              reabertos depois, se precisar.
             </Text>
             <View style={styles.dialogActions}>
               <PrimaryButton
@@ -201,7 +192,7 @@ export default function FecharMesScreen() {
                 style={styles.dialogBtn}
               />
               <PrimaryButton
-                title="Limpar"
+                title="Arquivar"
                 variant="danger"
                 onPress={() => void handleConfirm()}
                 loading={busy}
@@ -228,7 +219,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     padding: space.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -286,7 +277,7 @@ const styles = StyleSheet.create({
   },
   dialog: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     padding: space.lg,
     width: "100%",
     maxWidth: 420,

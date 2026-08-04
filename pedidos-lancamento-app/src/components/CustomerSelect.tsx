@@ -107,9 +107,9 @@ export function CustomerSelect({ customerId, customerName, onSelect }: Props) {
                       <Text style={styles.rowName} numberOfLines={1}>
                         {item.name}
                       </Text>
-                      {item.contact?.trim() ? (
+                      {item.phone?.trim() ? (
                         <Text style={styles.rowMeta} numberOfLines={1}>
-                          {item.contact.trim()}
+                          {item.phone.trim()}
                         </Text>
                       ) : null}
                     </View>
@@ -169,8 +169,10 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.bg,
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    borderTopWidth: 1,
+    borderColor: colors.border,
     padding: space.lg,
     maxHeight: "80%",
     gap: space.md,
