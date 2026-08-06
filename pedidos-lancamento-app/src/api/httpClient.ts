@@ -9,6 +9,16 @@ export class ApiError extends Error {
   }
 }
 
+/** A requisição nem chegou a ter resposta do servidor (rede/servidor fora do ar) — distinto de um erro que o servidor respondeu de propósito (ex.: senha errada). */
+export class NetworkError extends ApiError {
+  constructor() {
+    super(
+      "Não foi possível falar com o servidor. Verifique se ele está ligado e se o celular está na mesma rede.",
+      -1
+    );
+  }
+}
+
 /** Chamado pelo AuthProvider para reagir (redirecionar ao login) quando a sessão expira de vez. */
 let onSessionExpired: (() => void) | null = null;
 export function setSessionExpiredHandler(handler: () => void) {
@@ -48,15 +58,19 @@ async function readErrorMessage(res: Response): Promise<string> {
 async function refreshAccessToken(): Promise<string | null> {
   const tokens = await loadTokens();
   if (!tokens) return null;
-  const res = await fetch(joinUrl(requireBaseUrl(), "/v1/auth/refresh"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { accessToken: string };
-  await saveAccessToken(data.accessToken);
-  return data.accessToken;
+  try {
+    const res = await fetch(joinUrl(requireBaseUrl(), "/v1/auth/refresh"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { accessToken: string };
+    await saveAccessToken(data.accessToken);
+    return data.accessToken;
+  } catch {
+    return null;
+  }
 }
 
 type RequestOptions = {
@@ -69,11 +83,18 @@ type RequestOptions = {
 async function doFetch(base: string, path: string, options: RequestOptions, token: string | null) {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  return fetch(joinUrl(base, path), {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  try {
+    return await fetch(joinUrl(base, path), {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    // `fetch` rejeita (sem resposta HTTP nenhuma) quando o servidor está fora do ar,
+    // o endereço está errado ou não há rede — diferente de um erro que o servidor
+    // respondeu de propósito (ex.: 401 de senha errada).
+    throw new NetworkError();
+  }
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
