@@ -15,7 +15,11 @@ import {
   type CreateOrderInput,
   type UpdateOrderInput,
 } from "./api/ordersRemote";
+import { useAuth } from "./auth/authContext";
+import { useAutoRefresh } from "./hooks/useAutoRefresh";
 import type { Order } from "./types";
+
+type RefreshOptions = { silent?: boolean };
 
 type OrdersContextValue = {
   orders: Order[];
@@ -31,48 +35,79 @@ type OrdersContextValue = {
 const OrdersContext = createContext<OrdersContextValue | null>(null);
 
 export function OrdersProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (opts?: RefreshOptions) => {
+    if (!opts?.silent) setLoading(true);
     try {
       setOrders(await remoteListOrders("pending"));
     } catch (e) {
       console.error(e);
-      setOrders([]);
+      // Mantém a lista atual em erros pontuais — ver mesma decisão em customersContext.
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     void refresh();
-  }, [refresh]);
+  }, [user, refresh]);
 
-  const createOrder = useCallback(async (input: CreateOrderInput) => {
-    const created = await remoteCreateOrder(input);
-    setOrders((prev) => [created, ...prev]);
-    return created;
-  }, []);
+  // MVP de sincronização entre dispositivos via polling — ver customersContext.
+  useAutoRefresh(() => {
+    if (user) void refresh({ silent: true });
+  });
 
-  const updateOrder = useCallback(async (id: string, input: UpdateOrderInput) => {
-    const updated = await remoteUpdateOrder(id, input);
-    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
-  }, []);
+  const createOrder = useCallback(
+    async (input: CreateOrderInput) => {
+      const created = await remoteCreateOrder(input);
+      setOrders((prev) => [created, ...prev]);
+      void refresh({ silent: true });
+      return created;
+    },
+    [refresh]
+  );
 
-  const archiveOrder = useCallback(async (id: string) => {
-    await remoteArchiveOrder(id);
-    setOrders((prev) => prev.filter((o) => o.id !== id));
-  }, []);
+  const updateOrder = useCallback(
+    async (id: string, input: UpdateOrderInput) => {
+      const updated = await remoteUpdateOrder(id, input);
+      setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
+      void refresh({ silent: true });
+    },
+    [refresh]
+  );
 
-  const unarchiveOrder = useCallback(async (id: string) => {
-    await remoteUnarchiveOrder(id);
-    await refresh();
-  }, [refresh]);
+  const archiveOrder = useCallback(
+    async (id: string) => {
+      await remoteArchiveOrder(id);
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+      void refresh({ silent: true });
+    },
+    [refresh]
+  );
+
+  const unarchiveOrder = useCallback(
+    async (id: string) => {
+      const restored = await remoteUnarchiveOrder(id);
+      setOrders((prev) => [restored, ...prev.filter((o) => o.id !== id)]);
+      void refresh({ silent: true });
+    },
+    [refresh]
+  );
 
   const value = useMemo(
-    () => ({ orders, loading, refresh, createOrder, updateOrder, archiveOrder, unarchiveOrder }),
+    () => ({
+      orders,
+      loading,
+      refresh: () => refresh(),
+      createOrder,
+      updateOrder,
+      archiveOrder,
+      unarchiveOrder,
+    }),
     [orders, loading, refresh, createOrder, updateOrder, archiveOrder, unarchiveOrder]
   );
 
