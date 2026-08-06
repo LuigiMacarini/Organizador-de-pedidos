@@ -9,7 +9,7 @@ services:
     name: pedidos-api
     runtime: node
     plan: free
-    rootDir: server
+    rootDir: pedidos-lancamento-app/server
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: node dist/index.js
     envVars:

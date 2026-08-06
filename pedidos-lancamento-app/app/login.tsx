@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { FieldLabel } from "../src/components/FieldLabel";
 import { useAuth } from "../src/auth/authContext";
-import { ApiError } from "../src/api/httpClient";
+import { ApiError, NetworkError } from "../src/api/httpClient";
 import { colors, radii, space } from "../src/theme";
 
 export default function LoginScreen() {
@@ -22,8 +22,18 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
     } catch (e) {
-      const message = e instanceof ApiError ? e.message : "Não foi possível entrar.";
-      Alert.alert("Login", message);
+      if (e instanceof NetworkError) {
+        // Não deu pra alcançar o servidor — problema de infraestrutura/rede, não de credencial.
+        Alert.alert(
+          "Sem conexão com o servidor",
+          "Verifique se o servidor está ligado, se o endereço em EXPO_PUBLIC_API_URL está certo e se o celular está na mesma rede Wi-Fi do computador que roda a API."
+        );
+      } else if (e instanceof ApiError) {
+        // O servidor respondeu e recusou — normalmente e-mail/senha errados (do lado do usuário).
+        Alert.alert("Não foi possível entrar", e.message);
+      } else {
+        Alert.alert("Não foi possível entrar", "Ocorreu um erro inesperado. Tente novamente.");
+      }
     } finally {
       setBusy(false);
     }
