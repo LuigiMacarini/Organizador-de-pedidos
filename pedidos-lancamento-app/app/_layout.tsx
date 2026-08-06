@@ -1,5 +1,6 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "../src/auth/authContext";
@@ -7,6 +8,7 @@ import { CustomersProvider } from "../src/customersContext";
 import { OrdersProvider } from "../src/ordersContext";
 import { ProductsProvider } from "../src/productsContext";
 import { colors } from "../src/theme";
+import type { AuthUser } from "../src/types";
 
 const screenOptions = {
   headerShadowVisible: false,
@@ -16,8 +18,30 @@ const screenOptions = {
   contentStyle: { backgroundColor: colors.bg },
 };
 
+/**
+ * Todas as telas ficam sempre declaradas no Stack — no Expo Router v4,
+ * remover uma tela condicionalmente não impede o roteador de tentar
+ * resolver a URL atual para ela (quebra fora dos Providers). Em vez disso,
+ * redirecionamos com base no segmento da rota atual.
+ */
+function useProtectedRoute(user: AuthUser | null, loading: boolean) {
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    const inLoginScreen = segments[0] === "login";
+    if (!user && !inLoginScreen) {
+      router.replace("/login");
+    } else if (user && inLoginScreen) {
+      router.replace("/");
+    }
+  }, [user, loading, segments, router]);
+}
+
 function AppShell() {
   const { user, loading } = useAuth();
+  useProtectedRoute(user, loading);
 
   if (loading) {
     return (
@@ -27,19 +51,12 @@ function AppShell() {
     );
   }
 
-  if (!user) {
-    return (
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-      </Stack>
-    );
-  }
-
   return (
     <CustomersProvider>
       <ProductsProvider>
         <OrdersProvider>
           <Stack screenOptions={screenOptions}>
+            <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="novo" options={{ title: "Novo pedido" }} />
             <Stack.Screen name="pedido/[id]" options={{ title: "Pedido" }} />
