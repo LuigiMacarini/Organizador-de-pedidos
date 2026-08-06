@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
   },
   rowActive: {
     borderLeftColor: colors.primary,
+    backgroundColor: colors.bg,
   },
   info: { flex: 1, minWidth: 0 },
   name: { fontSize: 14, fontWeight: "600", color: colors.text },
