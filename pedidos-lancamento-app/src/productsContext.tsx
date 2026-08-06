@@ -7,6 +7,8 @@ import React, {
   useState,
 } from "react";
 import { remoteListProducts } from "./api/productsRemote";
+import { useAuth } from "./auth/authContext";
+import { normalizeForSearch } from "./utils/text";
 import type { Product } from "./types";
 
 export type CatalogSection = { category: string; products: Product[] };
@@ -35,11 +37,12 @@ function groupByCategory(products: Product[]): CatalogSection[] {
 }
 
 function matchesQuery(p: Product, q: string): boolean {
-  const hay = `${p.name} ${p.sku ?? ""} ${p.id}`.toLowerCase();
+  const hay = normalizeForSearch(`${p.name} ${p.sku ?? ""} ${p.id}`);
   return hay.includes(q);
 }
 
 export function ProductsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,15 +58,19 @@ export function ProductsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Refaz a busca sempre que o login muda — na primeira montagem os
+  // Providers sobem antes de haver sessão, então essa busca inicial falha
+  // sem token; sem depender de `user` ela nunca seria repetida após o login.
   useEffect(() => {
+    if (!user) return;
     void refresh();
-  }, [refresh]);
+  }, [user, refresh]);
 
   const sections = useMemo(() => groupByCategory(products), [products]);
 
   const searchSections = useCallback(
     (query: string): CatalogSection[] => {
-      const q = query.trim().toLowerCase();
+      const q = normalizeForSearch(query.trim());
       if (!q) return sections;
       return sections
         .map((sec) => ({

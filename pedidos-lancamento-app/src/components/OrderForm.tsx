@@ -1,8 +1,10 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Platform,
+  Pressable,
   SectionList,
   StyleSheet,
   Text,
@@ -42,6 +44,8 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: P
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<LineItem[]>(initial?.items ?? []);
+  /** Só uma categoria fica aberta por vez — reduz o quanto aparece na tela de uma vez. */
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const qtyByProduct = useMemo(() => {
     const map = new Map<string, number>();
@@ -54,6 +58,13 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: P
       searchSections(query).map((sec) => ({ title: sec.category, data: sec.products })),
     [searchSections, query]
   );
+
+  // Busca que sobra só uma categoria: abre ela direto, sem precisar tocar.
+  useEffect(() => {
+    if (sections.length === 1) {
+      setExpandedCategory(sections[0].title);
+    }
+  }, [sections]);
 
   const adjustProductQty = useCallback((p: Product, delta: number) => {
     if (delta === 0) return;
@@ -193,20 +204,40 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: P
       ListEmptyComponent={
         <Text style={styles.noResults}>Nenhum produto encontrado para esta busca.</Text>
       }
-      renderSectionHeader={({ section }) => (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <Text style={styles.sectionCount}>{section.data.length}</Text>
-        </View>
-      )}
-      renderItem={({ item }) => (
-        <ProductRow
-          product={item}
-          qty={qtyByProduct.get(item.id) ?? 0}
-          onAdjust={adjustProductQty}
-          onSetQty={setProductQtyAbsolute}
-        />
-      )}
+      renderSectionHeader={({ section }) => {
+        const isOpen = section.title === expandedCategory;
+        return (
+          <Pressable
+            onPress={() => setExpandedCategory(isOpen ? null : section.title)}
+            style={({ pressed }) => [styles.sectionHeader, pressed && styles.sectionHeaderPressed]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isOpen }}
+          >
+            <Text style={styles.sectionTitle} numberOfLines={1}>
+              {section.title}
+            </Text>
+            <View style={styles.sectionRight}>
+              <Text style={styles.sectionCount}>{section.data.length}</Text>
+              <Ionicons
+                name={isOpen ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.muted}
+              />
+            </View>
+          </Pressable>
+        );
+      }}
+      renderItem={({ item, section }) => {
+        if (section.title !== expandedCategory) return null;
+        return (
+          <ProductRow
+            product={item}
+            qty={qtyByProduct.get(item.id) ?? 0}
+            onAdjust={adjustProductQty}
+            onSetQty={setProductQtyAbsolute}
+          />
+        );
+      }}
     />
   );
 }
@@ -259,22 +290,27 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: space.sm,
+    minHeight: 52,
     paddingHorizontal: space.lg,
-    paddingVertical: space.xs,
+    paddingVertical: space.sm,
     backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     maxWidth: 720,
     width: "100%",
     alignSelf: "center",
   },
+  sectionHeaderPressed: { backgroundColor: colors.border },
   sectionTitle: {
-    fontSize: 12,
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: "800",
-    color: colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    color: colors.text,
   },
-  sectionCount: { fontSize: 12, color: colors.muted },
+  sectionRight: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  sectionCount: { fontSize: 13, color: colors.muted },
   submitButton: { marginTop: space.xs },
 });
