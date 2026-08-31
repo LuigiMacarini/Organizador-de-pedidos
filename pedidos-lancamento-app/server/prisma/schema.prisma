@@ -27,6 +27,14 @@ enum OrderStatus {
   CANCELED
 }
 
+/// Status da geocodificação do endereço do cliente (OpenRouteService).
+enum GeocodeStatus {
+  PENDING // endereço salvo, ainda não geocodificado
+  OK // lat/lng resolvidos com confiança
+  PARTIAL // resultado encontrado, mas com baixa confiança (revisar)
+  FAILED // não foi possível geocodificar (endereço incompleto ou não encontrado)
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -39,19 +47,32 @@ model User {
 
 /// Cliente (deduplicado por nome normalizado em `nameKey`).
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  nameKey   String   @unique
+  id           String   @id @default(cuid())
+  name         String
+  nameKey      String   @unique
   /// Telefone ou WhatsApp.
-  phone     String   @default("")
-  /// Preparado para o app do Cliente; não usado pelo painel do Dono ainda.
-  address   String?
-  note      String   @default("")
+  phone        String   @default("")
+  note         String   @default("")
+
+  /// Endereço estruturado, usado para geocodificação (roteirização de entregas).
+  street       String?
+  number       String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+
+  latitude      Float?
+  longitude     Float?
+  geocodeStatus GeocodeStatus @default(PENDING)
+  geocodedAt    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
 
   @@index([updatedAt])
+  @@index([geocodeStatus])
 }
 
 /// Catálogo administrável (substitui a lista fixa que vivia no bundle do app).

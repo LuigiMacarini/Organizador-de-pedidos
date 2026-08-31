@@ -32,8 +32,13 @@ export async function create(input: CustomerInput) {
       name: input.name,
       nameKey,
       phone: input.phone ?? "",
-      address: input.address,
       note: input.note ?? "",
+      street: input.street,
+      number: input.number,
+      neighborhood: input.neighborhood,
+      city: input.city,
+      state: input.state,
+      zipCode: input.zipCode,
     },
     include: withOrderCount,
   });
@@ -51,10 +56,33 @@ export async function update(id: string, input: CustomerInput) {
       name: input.name,
       nameKey,
       phone: input.phone ?? "",
-      address: input.address,
       note: input.note ?? "",
+      street: input.street,
+      number: input.number,
+      neighborhood: input.neighborhood,
+      city: input.city,
+      state: input.state,
+      zipCode: input.zipCode,
     },
     include: withOrderCount,
+  });
+}
+
+export type GeocodeResultUpdate =
+  | { status: "OK"; latitude: number; longitude: number }
+  | { status: "PARTIAL"; latitude: number; longitude: number }
+  | { status: "FAILED" };
+
+/** Grava o resultado de uma tentativa de geocodificação. Nunca lança — chamado de um contexto best-effort. */
+export function setGeocodeResult(id: string, result: GeocodeResultUpdate) {
+  return prisma.customer.update({
+    where: { id },
+    data: {
+      geocodeStatus: result.status,
+      latitude: result.status === "FAILED" ? null : result.latitude,
+      longitude: result.status === "FAILED" ? null : result.longitude,
+      geocodedAt: new Date(),
+    },
   });
 }
 

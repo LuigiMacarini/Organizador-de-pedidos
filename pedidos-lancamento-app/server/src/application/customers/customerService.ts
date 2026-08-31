@@ -1,6 +1,7 @@
 import * as customerRepository from "../../infrastructure/db/customerRepository.js";
+import { geocodeCustomer } from "../geocoding/geocodingService.js";
 import { NotFoundError } from "../../domain/errors.js";
-import { toCustomerDTO, type CustomerInput } from "../../domain/customer.js";
+import { ADDRESS_FIELDS, toCustomerDTO, type CustomerInput } from "../../domain/customer.js";
 import { toPage, type PaginationQuery } from "../../domain/pagination.js";
 
 export async function list(query: PaginationQuery) {
@@ -16,16 +17,29 @@ export async function get(id: string) {
 
 export async function create(input: CustomerInput) {
   const customer = await customerRepository.create(input);
-  return toCustomerDTO(customer);
+  await geocodeCustomer(customer.id);
+  return get(customer.id);
 }
 
 export async function update(id: string, input: CustomerInput) {
-  await get(id);
+  const existing = await get(id);
   const customer = await customerRepository.update(id, input);
+  const addressChanged = ADDRESS_FIELDS.some((field) => (existing[field] ?? "") !== (input[field] ?? ""));
+  if (addressChanged) {
+    await geocodeCustomer(customer.id);
+    return get(customer.id);
+  }
   return toCustomerDTO(customer);
 }
 
 export async function remove(id: string) {
   await get(id);
   await customerRepository.remove(id);
+}
+
+/** Força uma nova tentativa de geocodificação (reprocessamento manual). */
+export async function regeocode(id: string) {
+  await get(id);
+  await geocodeCustomer(id);
+  return get(id);
 }
