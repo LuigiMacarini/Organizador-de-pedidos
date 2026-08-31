@@ -68,3 +68,81 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     label: feature.properties?.label ?? "",
   };
 }
+
+export type Coordinate = { latitude: number; longitude: number };
+
+export type RouteStop = Coordinate & {
+  /** Identificador definido pelo chamador (ex.: id da Delivery) — devolvido na ordem otimizada. */
+  refId: string;
+};
+
+export type OptimizedRoute = {
+  /** `refId` de cada parada, na ordem em que devem ser visitadas. */
+  order: string[];
+  totalDistanceMeters: number;
+  totalDurationSeconds: number;
+};
+
+type VroomStep = { type: string; job?: number; id?: number };
+type VroomResponse = {
+  routes?: Array<{ distance?: number; duration: number; steps: VroomStep[] }>;
+};
+
+/**
+ * Calcula a ordem eficiente de visita a `stops`, partindo e retornando a
+ * `origin` (um único veículo/entregador). Usa o serviço `/optimization`
+ * (solver VROOM) do OpenRouteService.
+ *
+ * `stops` precisa ter pelo menos 1 parada. VROOM exige ids numéricos para
+ * jobs — por isso o índice na lista é usado como id interno, e traduzido de
+ * volta para `refId` na resposta.
+ */
+export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
+  if (stops.length === 0) {
+    throw new Error("optimizeRoute chamado sem nenhuma parada");
+  }
+
+  const body = {
+    jobs: stops.map((stop, index) => ({
+      id: index + 1,
+      location: [stop.longitude, stop.latitude],
+    })),
+    vehicles: [
+      {
+        id: 1,
+        profile: "driving-car",
+        start: [origin.longitude, origin.latitude],
+        end: [origin.longitude, origin.latitude],
+      },
+    ],
+    options: { g: true },
+  };
+
+  const res = await fetch(`${ORS_BASE_URL}/optimization`, {
+    method: "POST",
+    headers: { Authorization: apiKey(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenRouteService optimization falhou (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as VroomResponse;
+  const route = data.routes?.[0];
+  if (!route) {
+    throw new Error("OpenRouteService não retornou nenhuma rota viável");
+  }
+
+  const order = route.steps
+    .filter((step) => step.type === "job")
+    .map((step) => {
+      const jobIndex = (step.job ?? step.id ?? 0) - 1;
+      return stops[jobIndex].refId;
+    });
+
+  return {
+    order,
+    totalDistanceMeters: Math.round(route.distance ?? 0),
+    totalDurationSeconds: Math.round(route.duration),
+  };
+}

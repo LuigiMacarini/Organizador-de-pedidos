@@ -1,0 +1,89 @@
+import type { RouteStatus } from "@prisma/client";
+import { prisma } from "./prismaClient.js";
+
+const include = {
+  deliveries: { include: { customer: { select: { name: true } } } },
+} as const;
+
+export function findById(id: string) {
+  return prisma.route.findUnique({ where: { id }, include });
+}
+
+export function list(cursor: string | undefined, limit: number) {
+  return prisma.route.findMany({
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { createdAt: "desc" },
+    include,
+  });
+}
+
+export type NewDeliveryInput = {
+  orderId: string;
+  customerId: string;
+  sequence: number;
+  destinationLat: number;
+  destinationLng: number;
+};
+
+export type CreateRouteData = {
+  delivererId: string;
+  originLabel: string;
+  originLat: number;
+  originLng: number;
+  totalDistanceMeters: number;
+  totalDurationSeconds: number;
+  deliveries: NewDeliveryInput[];
+};
+
+/**
+ * Cria a rota + entregas e marca os pedidos correspondentes como `RELEASED`
+ * numa única transação — evita que dois entregadores roteirizem o mesmo
+ * pedido numa condição de corrida (ver plano, §17).
+ */
+export function create(data: CreateRouteData) {
+  return prisma.$transaction(async (tx) => {
+    const route = await tx.route.create({
+      data: {
+        delivererId: data.delivererId,
+        originLabel: data.originLabel,
+        originLat: data.originLat,
+        originLng: data.originLng,
+        totalDistanceMeters: data.totalDistanceMeters,
+        totalDurationSeconds: data.totalDurationSeconds,
+        deliveries: { create: data.deliveries },
+      },
+      include,
+    });
+
+    await tx.order.updateMany({
+      where: { id: { in: data.deliveries.map((d) => d.orderId) } },
+      data: { status: "RELEASED" },
+    });
+
+    return route;
+  });
+}
+
+export function setStatus(
+  id: string,
+  status: RouteStatus,
+  extra?: { startedAt?: Date; completedAt?: Date }
+) {
+  return prisma.route.update({
+    where: { id },
+    data: { status, ...extra },
+    include,
+  });
+}
+
+/** Devolve os pedidos da rota para `PENDING` — usado ao cancelar uma rota. */
+export function releaseOrdersBackToPending(routeId: string) {
+  return prisma.$transaction(async (tx) => {
+    const deliveries = await tx.delivery.findMany({ where: { routeId }, select: { orderId: true } });
+    await tx.order.updateMany({
+      where: { id: { in: deliveries.map((d) => d.orderId) } },
+      data: { status: "PENDING" },
+    });
+  });
+}

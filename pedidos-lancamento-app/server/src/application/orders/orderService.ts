@@ -1,5 +1,5 @@
 import * as orderRepository from "../../infrastructure/db/orderRepository.js";
-import { NotFoundError } from "../../domain/errors.js";
+import { AppError, NotFoundError } from "../../domain/errors.js";
 import {
   resolveStatusFilter,
   toOrderDTO,
@@ -14,6 +14,7 @@ export async function list(query: PaginationQuery & { status: OrderStatusFilter 
     cursor: query.cursor,
     limit: query.limit,
     statuses: resolveStatusFilter(query.status),
+    deliverableOnly: query.status === "deliverable",
   });
   return toPage(rows, query.limit, toOrderDTO);
 }
@@ -30,6 +31,10 @@ export async function create(input: CreateOrderInput) {
 }
 
 export async function update(id: string, input: UpdateOrderInput) {
+  const existing = await get(id);
+  if (existing.status === "RELEASED" || existing.status === "DELIVERED") {
+    throw new AppError("Este pedido já está em uma rota de entrega e não pode ser editado", 409);
+  }
   const order = await orderRepository.update(id, input);
   return toOrderDTO(order);
 }

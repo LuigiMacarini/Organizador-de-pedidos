@@ -35,6 +35,19 @@ enum GeocodeStatus {
   FAILED // não foi possível geocodificar (endereço incompleto ou não encontrado)
 }
 
+enum RouteStatus {
+  DRAFT // criada, ainda não iniciada pelo entregador
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -43,6 +56,7 @@ model User {
   role         Role     @default(EMPLOYEE)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  routes       Route[]
 }
 
 /// Cliente (deduplicado por nome normalizado em `nameKey`).
@@ -70,6 +84,7 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
+  deliveries Delivery[]
 
   @@index([updatedAt])
   @@index([geocodeStatus])
@@ -104,6 +119,7 @@ model Order {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   lines      OrderLine[]
+  deliveries Delivery[]
 
   @@index([customerId])
   @@index([updatedAt])
@@ -125,4 +141,60 @@ model OrderLine {
 
   @@index([orderId])
   @@index([productId])
+}
+
+/// Uma execução de entregas por um entregador. Agrupa `Delivery`s calculadas
+/// numa única chamada ao provedor de rotas (OpenRouteService).
+model Route {
+  id          String      @id @default(cuid())
+  delivererId String
+  deliverer   User        @relation(fields: [delivererId], references: [id])
+  status      RouteStatus @default(DRAFT)
+
+  originLabel String
+  originLat   Float
+  originLng   Float
+
+  totalDistanceMeters  Int?
+  totalDurationSeconds Int?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  deliveries Delivery[]
+
+  @@index([delivererId])
+  @@index([status])
+}
+
+/// Tentativa de entregar um pedido específico, dentro de uma rota, numa
+/// posição da sequência. Um pedido pode ter várias `Delivery`s ao longo do
+/// tempo (reentrega após falha), mas no máximo uma ativa (`PENDING`) por vez
+/// — garantido na aplicação, não no schema.
+model Delivery {
+  id      String @id @default(cuid())
+  routeId String
+  route   Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  sequence Int
+
+  /// Snapshot da coordenada do cliente no momento da criação da rota — uma
+  /// edição posterior do endereço não deve alterar uma entrega já roteirizada.
+  destinationLat Float
+  destinationLng Float
+
+  status      DeliveryStatus @default(PENDING)
+  deliveredAt DateTime?
+  notes       String         @default("")
+
+  @@index([routeId])
+  @@index([orderId])
 }

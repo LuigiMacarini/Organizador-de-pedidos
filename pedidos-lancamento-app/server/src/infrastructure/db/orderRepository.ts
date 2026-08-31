@@ -29,15 +29,26 @@ export function findById(id: string) {
   return prisma.order.findUnique({ where: { id }, include });
 }
 
+export function findManyByIds(ids: string[]) {
+  return prisma.order.findMany({ where: { id: { in: ids } }, include });
+}
+
 export function list(opts: {
   cursor: string | undefined;
   limit: number;
   statuses: OrderStatus[];
+  /** Só pedidos com cliente geocodificado e sem entrega ativa — usado pela roteirização. */
+  deliverableOnly?: boolean;
 }) {
   return prisma.order.findMany({
     take: opts.limit + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
-    where: { status: { in: opts.statuses } },
+    where: {
+      status: { in: opts.statuses },
+      ...(opts.deliverableOnly
+        ? { customer: { geocodeStatus: "OK" }, deliveries: { none: { status: "PENDING" } } }
+        : {}),
+    },
     orderBy: { updatedAt: "desc" },
     include,
   });
