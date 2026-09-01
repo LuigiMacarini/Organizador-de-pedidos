@@ -27,7 +27,13 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O ORG usa sua localização enquanto uma rota está em andamento, para mostrar sua posição no mapa e a distância até a próxima entrega."
+        }
+      ]
     ]
   }
 }

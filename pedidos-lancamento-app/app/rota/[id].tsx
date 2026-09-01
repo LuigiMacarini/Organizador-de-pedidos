@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/httpClient";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteMap, type MapStop } from "../../src/components/RouteMap";
+import { useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
@@ -50,6 +51,33 @@ export default function RotaDetalheScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Hooks precisam rodar sempre, na mesma ordem, mesmo antes de `route`
+  // existir — por isso ficam antes do retorno antecipado do loading, com
+  // acesso opcional (`route?.`) em vez de depois dele.
+  const canExecute = route?.status === "IN_PROGRESS";
+
+  const nextStopId = useMemo(
+    () => route?.deliveries.find((d) => d.status === "PENDING")?.id ?? null,
+    [route]
+  );
+  const mapStops: MapStop[] = useMemo(
+    () =>
+      (route?.deliveries ?? []).map((d) => ({
+        id: d.id,
+        lat: d.destinationLat,
+        lng: d.destinationLng,
+        sequence: d.sequence,
+        customerName: d.customerName,
+        status: d.status,
+      })),
+    [route]
+  );
+  const {
+    permission: locationPermission,
+    position: deliveryPosition,
+    error: locationError,
+  } = useDeliveryLocation(canExecute);
 
   if (loading || !route) {
     return (
@@ -112,26 +140,8 @@ export default function RotaDetalheScreen() {
     }
   };
 
-  const canExecute = route.status === "IN_PROGRESS";
   const canStart = route.status === "DRAFT";
   const canCancel = route.status === "DRAFT" || route.status === "IN_PROGRESS";
-
-  const nextStopId = useMemo(
-    () => route.deliveries.find((d) => d.status === "PENDING")?.id ?? null,
-    [route]
-  );
-  const mapStops: MapStop[] = useMemo(
-    () =>
-      route.deliveries.map((d) => ({
-        id: d.id,
-        lat: d.destinationLat,
-        lng: d.destinationLng,
-        sequence: d.sequence,
-        customerName: d.customerName,
-        status: d.status,
-      })),
-    [route]
-  );
 
   return (
     <>
@@ -146,6 +156,11 @@ export default function RotaDetalheScreen() {
             stops={mapStops}
             geometry={route.geometry}
             nextStopId={nextStopId}
+            currentPosition={
+              deliveryPosition
+                ? { lat: deliveryPosition.latitude, lng: deliveryPosition.longitude }
+                : null
+            }
             height={260}
           />
         </View>
@@ -160,6 +175,28 @@ export default function RotaDetalheScreen() {
             </View>
             <Text style={styles.originText}>Origem: {route.originLabel}</Text>
           </View>
+
+          {canExecute ? (
+            <View style={styles.gpsCard}>
+              <Text style={styles.gpsLabel}>Localização</Text>
+              {locationPermission === "services-disabled" ? (
+                <Text style={styles.gpsWarning}>Ative o GPS do celular para acompanhar sua posição.</Text>
+              ) : locationPermission === "denied" ? (
+                <Text style={styles.gpsWarning}>
+                  Permissão de localização negada — sem ela não é possível acompanhar sua posição na rota.
+                </Text>
+              ) : locationError ? (
+                <Text style={styles.gpsWarning}>{locationError}</Text>
+              ) : deliveryPosition ? (
+                <Text style={styles.gpsValue}>
+                  {deliveryPosition.latitude.toFixed(5)}, {deliveryPosition.longitude.toFixed(5)}
+                  {deliveryPosition.accuracy ? ` (±${Math.round(deliveryPosition.accuracy)}m)` : ""}
+                </Text>
+              ) : (
+                <Text style={styles.gpsValue}>Obtendo localização…</Text>
+              )}
+            </View>
+          ) : null}
 
           {route.deliveries.map((delivery, index) => (
             <View
@@ -273,6 +310,23 @@ const styles = StyleSheet.create({
   },
   summaryMeta: { fontSize: 14, color: colors.muted, fontWeight: "600" },
   originText: { fontSize: 15, color: colors.text, fontWeight: "600" },
+  gpsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: space.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  gpsLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  gpsValue: { fontSize: 14, color: colors.text, fontWeight: "600" },
+  gpsWarning: { fontSize: 14, color: colors.danger, lineHeight: 20 },
   stopCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
