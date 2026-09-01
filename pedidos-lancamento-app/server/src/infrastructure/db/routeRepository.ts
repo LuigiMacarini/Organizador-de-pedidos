@@ -42,6 +42,7 @@ export type CreateRouteData = {
   originLng: number;
   totalDistanceMeters: number;
   totalDurationSeconds: number;
+  geometry: string | null;
   deliveries: NewDeliveryInput[];
 };
 
@@ -60,6 +61,7 @@ export function create(data: CreateRouteData) {
         originLng: data.originLng,
         totalDistanceMeters: data.totalDistanceMeters,
         totalDurationSeconds: data.totalDurationSeconds,
+        geometry: data.geometry,
         deliveries: { create: data.deliveries },
       },
       include,
@@ -84,6 +86,16 @@ export function setStatus(
     data: { status, ...extra },
     include,
   });
+}
+
+/**
+ * Remove definitivamente rotas já encerradas (COMPLETED/CANCELED) — usado por
+ * "Limpar histórico". As `Delivery`s são apagadas em cascata (`onDelete: Cascade`
+ * na relação com `Route`); os `Order`s não são afetados, já com seu próprio
+ * status final (DELIVERED/PENDING) independente da rota existir ou não.
+ */
+export function deleteFinished() {
+  return prisma.route.deleteMany({ where: { status: { in: ["COMPLETED", "CANCELED"] } } });
 }
 
 /** Devolve os pedidos da rota para `PENDING` — usado ao cancelar uma rota. */

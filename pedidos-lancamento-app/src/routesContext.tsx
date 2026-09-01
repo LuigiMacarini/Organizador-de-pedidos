@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import {
   remoteCancelRoute,
+  remoteClearRouteHistory,
   remoteCreateRoute,
   remoteGetRoute,
   remoteListRoutes,
@@ -27,6 +28,7 @@ type RoutesContextValue = {
   startRoute: (id: string) => Promise<DeliveryRoute>;
   cancelRoute: (id: string) => Promise<DeliveryRoute>;
   updateDeliveryStatus: (deliveryId: string, status: "DELIVERED" | "FAILED", notes?: string) => Promise<void>;
+  clearHistory: () => Promise<number>;
 };
 
 const RoutesContext = createContext<RoutesContextValue | null>(null);
@@ -88,9 +90,25 @@ export function RoutesProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const clearHistory = useCallback(async () => {
+    const { deleted } = await remoteClearRouteHistory();
+    setRoutes((prev) => prev.filter((r) => r.status !== "COMPLETED" && r.status !== "CANCELED"));
+    return deleted;
+  }, []);
+
   const value = useMemo(
-    () => ({ routes, loading, refresh, createRoute, getRoute, startRoute, cancelRoute, updateDeliveryStatus }),
-    [routes, loading, refresh, createRoute, getRoute, startRoute, cancelRoute, updateDeliveryStatus]
+    () => ({
+      routes,
+      loading,
+      refresh,
+      createRoute,
+      getRoute,
+      startRoute,
+      cancelRoute,
+      updateDeliveryStatus,
+      clearHistory,
+    }),
+    [routes, loading, refresh, createRoute, getRoute, startRoute, cancelRoute, updateDeliveryStatus, clearHistory]
   );
 
   return <RoutesContext.Provider value={value}>{children}</RoutesContext.Provider>;

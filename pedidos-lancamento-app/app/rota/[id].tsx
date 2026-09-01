@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/httpClient";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
+import { RouteMap, type MapStop } from "../../src/components/RouteMap";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
@@ -23,11 +24,6 @@ function formatDistance(meters: number | null) {
 function formatDuration(seconds: number | null) {
   if (!seconds) return "—";
   return `${Math.round(seconds / 60)} min`;
-}
-
-/** Abre o app de mapas do próprio celular (Google Maps/Waze/Apple Maps) com a rota até o ponto. */
-function openInMaps(lat: number, lng: number) {
-  void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
 }
 
 export default function RotaDetalheScreen() {
@@ -78,26 +74,29 @@ export default function RotaDetalheScreen() {
   };
 
   const handleCancel = () => {
+    const run = async () => {
+      setBusy(true);
+      try {
+        await cancelRoute(route.id);
+        router.back();
+      } catch (e) {
+        Alert.alert("Rota", e instanceof ApiError ? e.message : "Não foi possível cancelar.");
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    // Alert.alert com múltiplos botões não dispara onPress corretamente no
+    // React Native Web — mesmo problema já tratado em CustomerForm.tsx.
+    if (Platform.OS === "web") {
+      const ok = typeof window !== "undefined" && window.confirm("Cancelar rota? Os pedidos voltam para a lista de disponíveis.");
+      if (ok) void run();
+      return;
+    }
+
     Alert.alert("Cancelar rota", "Os pedidos voltam para a lista de disponíveis. Continuar?", [
       { text: "Voltar", style: "cancel" },
-      {
-        text: "Cancelar rota",
-        style: "destructive",
-        onPress: () => {
-          const run = async () => {
-            setBusy(true);
-            try {
-              await cancelRoute(route.id);
-              router.back();
-            } catch (e) {
-              Alert.alert("Rota", e instanceof ApiError ? e.message : "Não foi possível cancelar.");
-            } finally {
-              setBusy(false);
-            }
-          };
-          void run();
-        },
-      },
+      { text: "Cancelar rota", style: "destructive", onPress: () => void run() },
     ]);
   };
 
@@ -117,10 +116,40 @@ export default function RotaDetalheScreen() {
   const canStart = route.status === "DRAFT";
   const canCancel = route.status === "DRAFT" || route.status === "IN_PROGRESS";
 
+  const nextStopId = useMemo(
+    () => route.deliveries.find((d) => d.status === "PENDING")?.id ?? null,
+    [route]
+  );
+  const mapStops: MapStop[] = useMemo(
+    () =>
+      route.deliveries.map((d) => ({
+        id: d.id,
+        lat: d.destinationLat,
+        lng: d.destinationLng,
+        sequence: d.sequence,
+        customerName: d.customerName,
+        status: d.status,
+      })),
+    [route]
+  );
+
   return (
     <>
       <Stack.Screen options={{ title: route.originLabel }} />
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+        {/* Fora do ScrollView de propósito: um WebView (o mapa) dentro de um
+            ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela
+            no React Native. Mapa fixo em cima, lista rola independente embaixo. */}
+        <View style={styles.mapWrap}>
+          <RouteMap
+            origin={{ lat: route.originLat, lng: route.originLng, label: route.originLabel }}
+            stops={mapStops}
+            geometry={route.geometry}
+            nextStopId={nextStopId}
+            height={260}
+          />
+        </View>
+
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
@@ -133,10 +162,15 @@ export default function RotaDetalheScreen() {
           </View>
 
           {route.deliveries.map((delivery, index) => (
-            <View key={delivery.id} style={styles.stopCard}>
+            <View
+              key={delivery.id}
+              style={[styles.stopCard, delivery.id === nextStopId && styles.stopCardNext]}
+            >
               <View style={styles.stopHeader}>
-                <View style={styles.stopNumber}>
-                  <Text style={styles.stopNumberText}>{index + 1}</Text>
+                <View style={[styles.stopNumber, delivery.id === nextStopId && styles.stopNumberNext]}>
+                  <Text style={[styles.stopNumberText, delivery.id === nextStopId && styles.stopNumberTextNext]}>
+                    {index + 1}
+                  </Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.stopCustomer}>{delivery.customerName}</Text>
@@ -147,7 +181,9 @@ export default function RotaDetalheScreen() {
                       delivery.status === "FAILED" && styles.stopStatusFailed,
                     ]}
                   >
-                    {delivery.status === "PENDING"
+                    {delivery.id === nextStopId && canExecute
+                      ? "Próxima entrega"
+                      : delivery.status === "PENDING"
                       ? "Aguardando"
                       : delivery.status === "DELIVERED"
                       ? "Entregue"
@@ -157,12 +193,6 @@ export default function RotaDetalheScreen() {
               </View>
 
               {delivery.address ? <Text style={styles.stopAddress}>{delivery.address}</Text> : null}
-
-              <PrimaryButton
-                title="Abrir no mapa"
-                variant="ghost"
-                onPress={() => openInMaps(delivery.destinationLat, delivery.destinationLng)}
-              />
 
               {canExecute && delivery.status === "PENDING" ? (
                 <View style={styles.stopActions}>
@@ -210,6 +240,13 @@ export default function RotaDetalheScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  mapWrap: {
+    padding: space.lg,
+    paddingBottom: 0,
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
+  },
   content: {
     padding: space.lg,
     paddingBottom: space.xl * 2,
@@ -244,6 +281,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: space.md,
   },
+  stopCardNext: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
   stopHeader: { flexDirection: "row", alignItems: "center", gap: space.md },
   stopNumber: {
     width: 32,
@@ -255,7 +296,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  stopNumberNext: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
   stopNumberText: { fontWeight: "800", color: colors.text },
+  stopNumberTextNext: { color: "#fff" },
   stopCustomer: { fontSize: 16, fontWeight: "700", color: colors.text },
   stopAddress: { fontSize: 14, color: colors.muted, lineHeight: 20 },
   stopStatus: { fontSize: 13, color: colors.muted, marginTop: 2, fontWeight: "600" },

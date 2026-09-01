@@ -1,7 +1,9 @@
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
+
+const FINISHED_STATUSES: RouteStatus[] = ["COMPLETED", "CANCELED"];
 
 const STATUS_LABEL: Record<RouteStatus, string> = {
   DRAFT: "Rascunho",
@@ -30,9 +34,71 @@ function formatDuration(seconds: number | null) {
   return `${Math.round(seconds / 60)} min`;
 }
 
+function RouteCard({ route, onPress }: { route: DeliveryRoute; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
+      <View style={styles.cardTop}>
+        <Text style={styles.statusBadge}>{STATUS_LABEL[route.status]}</Text>
+        <Text style={styles.stopCount}>
+          {route.deliveries.length} {route.deliveries.length === 1 ? "parada" : "paradas"}
+        </Text>
+      </View>
+      <Text style={styles.origin} numberOfLines={1}>
+        {route.originLabel}
+      </Text>
+      <View style={styles.cardBottom}>
+        <Text style={styles.meta}>
+          {new Date(route.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+        </Text>
+        <Text style={styles.meta}>
+          {formatDistance(route.totalDistanceMeters)}
+          {route.totalDurationSeconds ? ` · ${formatDuration(route.totalDurationSeconds)}` : ""}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function RotasScreen() {
   const router = useRouter();
-  const { routes, loading } = useRoutes();
+  const { routes, loading, clearHistory } = useRoutes();
+  const [clearing, setClearing] = useState(false);
+
+  const { active, finished } = useMemo(() => {
+    const active: DeliveryRoute[] = [];
+    const finished: DeliveryRoute[] = [];
+    for (const r of routes) {
+      (FINISHED_STATUSES.includes(r.status) ? finished : active).push(r);
+    }
+    return { active, finished };
+  }, [routes]);
+
+  const handleClearHistory = () => {
+    const run = async () => {
+      setClearing(true);
+      try {
+        await clearHistory();
+      } catch (e) {
+        console.error(e);
+        Alert.alert("Histórico", "Não foi possível limpar o histórico.");
+      } finally {
+        setClearing(false);
+      }
+    };
+
+    // Mesmo cuidado de handleCancel em rota/[id].tsx: Alert.alert multi-botão
+    // não funciona no React Native Web.
+    if (Platform.OS === "web") {
+      const ok = typeof window !== "undefined" && window.confirm(`Apagar ${finished.length} rota(s) do histórico?`);
+      if (ok) void run();
+      return;
+    }
+
+    Alert.alert("Limpar histórico", `Apagar ${finished.length} rota(s) concluída(s)/cancelada(s)? Isso não afeta os pedidos.`, [
+      { text: "Voltar", style: "cancel" },
+      { text: "Limpar", style: "destructive", onPress: () => void run() },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -63,35 +129,30 @@ export default function RotasScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
-          {routes.map((r: DeliveryRoute) => (
-            <Pressable
-              key={r.id}
-              onPress={() => router.push(`/rota/${r.id}`)}
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
-            >
-              <View style={styles.cardTop}>
-                <Text style={styles.statusBadge}>{STATUS_LABEL[r.status]}</Text>
-                <Text style={styles.stopCount}>
-                  {r.deliveries.length} {r.deliveries.length === 1 ? "parada" : "paradas"}
-                </Text>
+          {active.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Ativas</Text>
+              {active.map((r) => (
+                <RouteCard key={r.id} route={r} onPress={() => router.push(`/rota/${r.id}`)} />
+              ))}
+            </View>
+          ) : null}
+
+          {finished.length > 0 ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Histórico</Text>
+                <Pressable onPress={handleClearHistory} disabled={clearing} hitSlop={8}>
+                  <Text style={[styles.clearLink, clearing && { opacity: 0.5 }]}>
+                    {clearing ? "Limpando…" : "Limpar histórico"}
+                  </Text>
+                </Pressable>
               </View>
-              <Text style={styles.origin} numberOfLines={1}>
-                {r.originLabel}
-              </Text>
-              <View style={styles.cardBottom}>
-                <Text style={styles.meta}>
-                  {new Date(r.createdAt).toLocaleString("pt-BR", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                </Text>
-                <Text style={styles.meta}>
-                  {formatDistance(r.totalDistanceMeters)}
-                  {r.totalDurationSeconds ? ` · ${formatDuration(r.totalDurationSeconds)}` : ""}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+              {finished.map((r) => (
+                <RouteCard key={r.id} route={r} onPress={() => router.push(`/rota/${r.id}`)} />
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -137,11 +198,25 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   list: {
     padding: space.lg,
-    gap: space.md,
+    gap: space.xl,
     maxWidth: 720,
     width: "100%",
     alignSelf: "center",
   },
+  section: { gap: space.md },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  clearLink: { fontSize: 13, fontWeight: "700", color: colors.danger },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

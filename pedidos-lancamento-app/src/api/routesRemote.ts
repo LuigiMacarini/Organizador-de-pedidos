@@ -31,6 +31,11 @@ export function remoteCancelRoute(id: string): Promise<DeliveryRoute> {
   return apiRequest<DeliveryRoute>(`/v1/routes/${id}/cancel`, { method: "POST" });
 }
 
+/** Apaga definitivamente rotas já encerradas (COMPLETED/CANCELED). Rotas ativas não são afetadas. */
+export function remoteClearRouteHistory(): Promise<{ deleted: number }> {
+  return apiRequest<{ deleted: number }>("/v1/routes/clear-history", { method: "POST" });
+}
+
 export function remoteUpdateDeliveryStatus(
   id: string,
   status: "DELIVERED" | "FAILED",

@@ -157,6 +157,9 @@ model Route {
 
   totalDistanceMeters  Int?
   totalDurationSeconds Int?
+  /// Polyline codificada (formato padrão Google/OSRM) do trajeto real devolvido
+  /// pelo OpenRouteService — usada para desenhar a rota no mapa dentro do app.
+  geometry             String?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

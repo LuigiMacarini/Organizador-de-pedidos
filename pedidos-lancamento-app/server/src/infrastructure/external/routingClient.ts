@@ -81,11 +81,13 @@ export type OptimizedRoute = {
   order: string[];
   totalDistanceMeters: number;
   totalDurationSeconds: number;
+  /** Polyline codificada (padrão Google/OSRM) do trajeto real — `null` se o provedor não devolveu geometria. */
+  geometry: string | null;
 };
 
 type VroomStep = { type: string; job?: number; id?: number };
 type VroomResponse = {
-  routes?: Array<{ distance?: number; duration: number; steps: VroomStep[] }>;
+  routes?: Array<{ distance?: number; duration: number; steps: VroomStep[]; geometry?: string }>;
 };
 
 /**
@@ -144,5 +146,6 @@ export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Pro
     order,
     totalDistanceMeters: Math.round(route.distance ?? 0),
     totalDurationSeconds: Math.round(route.duration),
+    geometry: route.geometry ?? null,
   };
 }

@@ -68,6 +68,7 @@ export type DeliveryRoute = {
   originLng: number;
   totalDistanceMeters: number | null;
   totalDurationSeconds: number | null;
+  geometry: string | null;
   createdAt: number;
   updatedAt: number;
   startedAt: number | null;

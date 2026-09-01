@@ -28,4 +28,8 @@ export default async function routeRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/v1/routes/:id/cancel", async (request) => {
     return routeService.cancel(request.params.id);
   });
+
+  app.post("/v1/routes/clear-history", async () => {
+    return routeService.clearHistory();
+  });
 }

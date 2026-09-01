@@ -58,6 +58,8 @@ export type RouteDTO = {
   originLng: number;
   totalDistanceMeters: number | null;
   totalDurationSeconds: number | null;
+  /** Polyline codificada do trajeto real (padrão Google/OSRM) — `null` se a otimização falhou (modo degradado, ver §13). */
+  geometry: string | null;
   createdAt: number;
   updatedAt: number;
   startedAt: number | null;
@@ -94,6 +96,7 @@ export function toRouteDTO(
     originLng: route.originLng,
     totalDistanceMeters: route.totalDistanceMeters,
     totalDurationSeconds: route.totalDurationSeconds,
+    geometry: route.geometry,
     createdAt: route.createdAt.getTime(),
     updatedAt: route.updatedAt.getTime(),
     startedAt: route.startedAt?.getTime() ?? null,

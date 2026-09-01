@@ -71,17 +71,21 @@ export async function create(input: CreateRouteInput, delivererId: string) {
   let orderedIds: string[];
   let totalDistanceMeters: number;
   let totalDurationSeconds: number;
+  let geometry: string | null;
   try {
     const optimized = await optimizeRoute({ latitude: origin.lat, longitude: origin.lng }, stops);
     orderedIds = optimized.order;
     totalDistanceMeters = optimized.totalDistanceMeters;
     totalDurationSeconds = optimized.totalDurationSeconds;
+    geometry = optimized.geometry;
   } catch {
     // Modo degradado (plano, §13): o provedor falhou, mas isso não deve
-    // travar a criação da rota — segue com a ordem de seleção, sem métricas.
+    // travar a criação da rota — segue com a ordem de seleção, sem métricas
+    // nem geometria (o mapa cai de volta em linhas retas entre os pontos).
     orderedIds = input.orderIds;
     totalDistanceMeters = 0;
     totalDurationSeconds = 0;
+    geometry = null;
   }
 
   const byId = new Map(orders.map((o) => [o.id, o]));
@@ -103,6 +107,7 @@ export async function create(input: CreateRouteInput, delivererId: string) {
     originLng: origin.lng,
     totalDistanceMeters,
     totalDurationSeconds,
+    geometry,
     deliveries,
   });
 
@@ -116,6 +121,12 @@ export async function start(id: string) {
   }
   const updated = await routeRepository.setStatus(id, "IN_PROGRESS", { startedAt: new Date() });
   return toRouteDTO(updated);
+}
+
+/** "Limpar histórico": apaga rotas já encerradas (COMPLETED/CANCELED). Rotas ativas nunca são afetadas. */
+export async function clearHistory() {
+  const result = await routeRepository.deleteFinished();
+  return { deleted: result.count };
 }
 
 export async function cancel(id: string) {
