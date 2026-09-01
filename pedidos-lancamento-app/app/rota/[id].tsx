@@ -147,7 +147,7 @@ export default function RotaDetalheScreen() {
     <>
       <Stack.Screen options={{ title: route.originLabel }} />
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
-        {/* Fora do ScrollView de propósito: um WebView (o mapa) dentro de um
+        {/* Fora do ScrollView de propósito: o MapView nativo dentro de um
             ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela
             no React Native. Mapa fixo em cima, lista rola independente embaixo. */}
         <View style={styles.mapWrap}>
