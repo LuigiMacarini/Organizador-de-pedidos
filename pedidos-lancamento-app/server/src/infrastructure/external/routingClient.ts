@@ -1,14 +1,19 @@
 /**
- * Único módulo que fala HTTP com o OpenRouteService. Nenhum outro arquivo do
- * backend deve importar `fetch` para essa API diretamente — isso mantém a
- * troca de provedor (se algum dia for necessária) restrita a este arquivo.
+ * Único módulo que fala HTTP com o Google Maps Platform. Nenhum outro
+ * arquivo do backend deve importar `fetch` para essas APIs diretamente —
+ * isso mantém a troca de provedor (se algum dia for necessária) restrita a
+ * este arquivo. (Antes usava OpenRouteService — trocado por decisão
+ * explícita do projeto, billing já configurado.)
  */
 
-const ORS_BASE_URL = "https://api.openrouteservice.org";
+const GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+const ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
+const PLACES_AUTOCOMPLETE_URL = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
+const PLACE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
 
 function apiKey(): string {
-  const key = process.env.ORS_API_KEY;
-  if (!key) throw new Error("ORS_API_KEY não configurada");
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new Error("GOOGLE_MAPS_API_KEY não configurada");
   return key;
 }
 
@@ -21,66 +26,77 @@ export type GeocodeAddressInput = {
   zipCode?: string | null;
 };
 
+/**
+ * Precisão do resultado, conforme a própria Google classifica:
+ * `ROOFTOP` = ponto exato do endereço; `RANGE_INTERPOLATED` = interpolado
+ * entre números conhecidos na mesma rua (ainda confiável); `GEOMETRIC_CENTER`
+ * = centro de uma rua/área inteira (o mesmo problema de "centroide" que
+ * identificamos com o provedor anterior); `APPROXIMATE` = o mais vago.
+ */
+export type GeocodeLocationType = "ROOFTOP" | "RANGE_INTERPOLATED" | "GEOMETRIC_CENTER" | "APPROXIMATE";
+
 export type GeocodeResult = {
   latitude: number;
   longitude: number;
-  /** 0–1, confiança do Pelias no resultado. Sem valor documentado de corte — calibrar com endereços reais. */
-  confidence: number;
-  /** Endereço formatado que o provedor efetivamente casou — útil para depuração/revisão manual. */
+  /** Endereço formatado que a Google efetivamente casou — útil pra revisão manual. */
   label: string;
-  /**
-   * Nível geográfico do resultado (`venue`/`address`/`street` = específico;
-   * `neighbourhood`/`locality`/`region`/`country` = genérico demais para ser
-   * a localização de um cliente). Ver `geocodingService` — usado junto com a
-   * confiança pra nunca aceitar em silêncio um resultado no nível "cidade".
-   */
-  layer: string;
+  locationType: GeocodeLocationType;
+  /** `true` quando a Google não teve certeza de que o resultado corresponde exatamente ao endereço enviado. */
+  partialMatch: boolean;
 };
 
-type PeliasFeatureCollection = {
-  features?: Array<{
-    geometry: { coordinates: [number, number] };
-    properties?: { confidence?: number; label?: string; layer?: string };
+type GoogleGeocodeResponse = {
+  status: string;
+  results: Array<{
+    formatted_address: string;
+    geometry: {
+      location: { lat: number; lng: number };
+      location_type: GeocodeLocationType;
+    };
+    partial_match?: boolean;
   }>;
 };
 
 /**
- * Geocodifica um endereço estruturado via `/geocode/search/structured`.
- * Retorna `null` quando o provedor não encontra nenhum resultado (não é erro).
- *
- * NÃO envia `neighbourhood` (bairro): testado e confirmado que o Pelias trata
- * esse campo como filtro rígido — quando o bairro informado não bate
- * exatamente com o indexado (comum com nomes genéricos tipo "Centro", que
- * existem em qualquer cidade), a busca inteira falha no nível de rua e cai
- * para o centro da cidade, ainda com confiança alta o bastante pra parecer
- * um resultado bom. Sem o bairro, rua+número+cidade+UF sozinhos já bateram
- * com confiança 1.0 nos testes feitos contra o provedor real.
+ * Geocodifica um endereço estruturado via Geocoding API. Diferente do
+ * provedor anterior (busca estruturada com filtros rígidos), a Google usa
+ * texto livre com parsing tolerante — por isso montamos uma única string
+ * com todos os campos, incluindo bairro (aqui não atrapalha o resultado).
+ * Retorna `null` quando não encontra nada (não é erro).
  */
 export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeResult | null> {
-  const params = new URLSearchParams({ api_key: apiKey(), size: "1", "boundary.country": "BRA" });
+  const address = [
+    [input.street, input.number].filter(Boolean).join(", "),
+    input.neighborhood,
+    input.city,
+    input.state,
+    input.zipCode,
+    "Brasil",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
-  const address = [input.street, input.number].filter(Boolean).join(", ");
-  if (address) params.set("address", address);
-  if (input.city) params.set("locality", input.city);
-  if (input.state) params.set("region", input.state);
-  if (input.zipCode) params.set("postalcode", input.zipCode);
-
-  const res = await fetch(`${ORS_BASE_URL}/geocode/search/structured?${params.toString()}`);
+  const params = new URLSearchParams({ address, key: apiKey(), region: "br" });
+  const res = await fetch(`${GEOCODING_URL}?${params.toString()}`);
   if (!res.ok) {
-    throw new Error(`OpenRouteService geocoding falhou (HTTP ${res.status})`);
+    throw new Error(`Google Geocoding falhou (HTTP ${res.status})`);
   }
 
-  const data = (await res.json()) as PeliasFeatureCollection;
-  const feature = data.features?.[0];
-  if (!feature) return null;
+  const data = (await res.json()) as GoogleGeocodeResponse;
+  if (data.status === "ZERO_RESULTS") return null;
+  if (data.status !== "OK") {
+    throw new Error(`Google Geocoding retornou status ${data.status}`);
+  }
 
-  const [longitude, latitude] = feature.geometry.coordinates;
+  const result = data.results[0];
+  if (!result) return null;
+
   return {
-    latitude,
-    longitude,
-    confidence: feature.properties?.confidence ?? 0,
-    label: feature.properties?.label ?? "",
-    layer: feature.properties?.layer ?? "unknown",
+    latitude: result.geometry.location.lat,
+    longitude: result.geometry.location.lng,
+    label: result.formatted_address,
+    locationType: result.geometry.location_type,
+    partialMatch: result.partial_match ?? false,
   };
 }
 
@@ -96,71 +112,153 @@ export type OptimizedRoute = {
   order: string[];
   totalDistanceMeters: number;
   totalDurationSeconds: number;
-  /** Polyline codificada (padrão Google/OSRM) do trajeto real — `null` se o provedor não devolveu geometria. */
+  /** Polyline codificada (mesmo formato Google/OSRM padrão — compatível com o decoder já existente no frontend). */
   geometry: string | null;
 };
 
-type VroomStep = { type: string; job?: number; id?: number };
-type VroomResponse = {
-  routes?: Array<{ distance?: number; duration: number; steps: VroomStep[]; geometry?: string }>;
+type ComputeRoutesResponse = {
+  routes?: Array<{
+    duration?: string;
+    distanceMeters?: number;
+    polyline?: { encodedPolyline?: string };
+    optimizedIntermediateWaypointIndex?: number[];
+  }>;
 };
 
 /**
- * Calcula a ordem eficiente de visita a `stops`, partindo e retornando a
- * `origin` (um único veículo/entregador). Usa o serviço `/optimization`
- * (solver VROOM) do OpenRouteService.
- *
- * `stops` precisa ter pelo menos 1 parada. VROOM exige ids numéricos para
- * jobs — por isso o índice na lista é usado como id interno, e traduzido de
- * volta para `refId` na resposta.
+ * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` e
+ * retornando a ela (viagem de ida e volta ao depósito). Usa a Routes API
+ * (`computeRoutes`) com `optimizeWaypointOrder: true`.
  */
 export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
   if (stops.length === 0) {
     throw new Error("optimizeRoute chamado sem nenhuma parada");
   }
 
+  const toWaypoint = (c: Coordinate) => ({
+    location: { latLng: { latitude: c.latitude, longitude: c.longitude } },
+  });
+
   const body = {
-    jobs: stops.map((stop, index) => ({
-      id: index + 1,
-      location: [stop.longitude, stop.latitude],
-    })),
-    vehicles: [
-      {
-        id: 1,
-        profile: "driving-car",
-        start: [origin.longitude, origin.latitude],
-        end: [origin.longitude, origin.latitude],
-      },
-    ],
-    options: { g: true },
+    origin: toWaypoint(origin),
+    destination: toWaypoint(origin),
+    intermediates: stops.map(toWaypoint),
+    travelMode: "DRIVE",
+    optimizeWaypointOrder: true,
   };
 
-  const res = await fetch(`${ORS_BASE_URL}/optimization`, {
+  const res = await fetch(ROUTES_URL, {
     method: "POST",
-    headers: { Authorization: apiKey(), "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey(),
+      "X-Goog-FieldMask":
+        "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex",
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`OpenRouteService optimization falhou (HTTP ${res.status})`);
+    const text = await res.text();
+    throw new Error(`Google Routes falhou (HTTP ${res.status}): ${text}`);
   }
 
-  const data = (await res.json()) as VroomResponse;
+  const data = (await res.json()) as ComputeRoutesResponse;
   const route = data.routes?.[0];
   if (!route) {
-    throw new Error("OpenRouteService não retornou nenhuma rota viável");
+    throw new Error("Google Routes não retornou nenhuma rota viável");
   }
 
-  const order = route.steps
-    .filter((step) => step.type === "job")
-    .map((step) => {
-      const jobIndex = (step.job ?? step.id ?? 0) - 1;
-      return stops[jobIndex].refId;
-    });
+  const orderIndexes = route.optimizedIntermediateWaypointIndex ?? stops.map((_, i) => i);
+  const order = orderIndexes.map((i) => stops[i].refId);
+  const durationSeconds = route.duration ? Math.round(parseFloat(route.duration.replace("s", ""))) : 0;
 
   return {
     order,
-    totalDistanceMeters: Math.round(route.distance ?? 0),
-    totalDurationSeconds: Math.round(route.duration),
-    geometry: route.geometry ?? null,
+    totalDistanceMeters: route.distanceMeters ?? 0,
+    totalDurationSeconds: durationSeconds,
+    geometry: route.polyline?.encodedPolyline ?? null,
+  };
+}
+
+export type PlaceSuggestion = {
+  placeId: string;
+  description: string;
+};
+
+type AutocompleteResponse = {
+  status: string;
+  predictions: Array<{ place_id: string; description: string }>;
+};
+
+/** Sugestões de endereço conforme o usuário digita — usado no cadastro de cliente. */
+export async function autocompleteAddress(input: string): Promise<PlaceSuggestion[]> {
+  const params = new URLSearchParams({
+    input,
+    key: apiKey(),
+    components: "country:br",
+    language: "pt-BR",
+  });
+  const res = await fetch(`${PLACES_AUTOCOMPLETE_URL}?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Google Places autocomplete falhou (HTTP ${res.status})`);
+  }
+  const data = (await res.json()) as AutocompleteResponse;
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    throw new Error(`Google Places autocomplete retornou status ${data.status}`);
+  }
+  return (data.predictions ?? []).map((p) => ({ placeId: p.place_id, description: p.description }));
+}
+
+export type PlaceDetails = {
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+  street: string | null;
+  number: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+};
+
+type PlaceDetailsResponse = {
+  status: string;
+  result?: {
+    formatted_address: string;
+    geometry: { location: { lat: number; lng: number } };
+    address_components: Array<{ long_name: string; short_name: string; types: string[] }>;
+  };
+};
+
+/** Detalhes completos de um lugar escolhido no autocomplete — inclui coordenada exata e endereço decomposto. */
+export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+  const params = new URLSearchParams({
+    place_id: placeId,
+    key: apiKey(),
+    language: "pt-BR",
+    fields: "formatted_address,geometry,address_component",
+  });
+  const res = await fetch(`${PLACE_DETAILS_URL}?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Google Place Details falhou (HTTP ${res.status})`);
+  }
+  const data = (await res.json()) as PlaceDetailsResponse;
+  if (data.status !== "OK" || !data.result) return null;
+
+  const comp = (type: string) =>
+    data.result!.address_components.find((c) => c.types.includes(type))?.long_name ?? null;
+  const state = data.result.address_components.find((c) => c.types.includes("administrative_area_level_1"))
+    ?.short_name;
+
+  return {
+    latitude: data.result.geometry.location.lat,
+    longitude: data.result.geometry.location.lng,
+    formattedAddress: data.result.formatted_address,
+    street: comp("route"),
+    number: comp("street_number"),
+    neighborhood: comp("sublocality") ?? comp("sublocality_level_1") ?? comp("neighborhood"),
+    city: comp("administrative_area_level_2") ?? comp("locality"),
+    state: state ?? null,
+    zipCode: comp("postal_code"),
   };
 }

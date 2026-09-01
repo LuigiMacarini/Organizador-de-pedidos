@@ -25,7 +25,7 @@ services:
         sync: false
       - key: SEED_OWNER_NAME
         value: Dono
-      - key: ORS_API_KEY
+      - key: GOOGLE_MAPS_API_KEY
         sync: false
       - key: COMPANY_ORIGIN_LAT
         sync: false
