@@ -18,7 +18,11 @@
       "adaptiveIcon": {
         "backgroundColor": "#F4F6FA"
       },
-      "package": "com.example.pedidoslancamento"
+      "package": "com.example.pedidoslancamento",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +38,15 @@
           "locationWhenInUsePermission": "O ORG usa sua localização enquanto uma rota está em andamento, para mostrar sua posição no mapa e a distância até a próxima entrega."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "0382c83f-d5ac-4841-961a-7bb04f97adf7"
+      }
+    },
+    "owner": "luigimn"
   }
 }
