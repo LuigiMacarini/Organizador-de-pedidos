@@ -34,6 +34,15 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="rotas"
+        options={{
+          title: "Rotas",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="navigate-outline" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

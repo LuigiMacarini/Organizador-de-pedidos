@@ -1,10 +1,19 @@
 import type { DeliveryStatus } from "@prisma/client";
 import { prisma } from "./prismaClient.js";
 
+const customerSelect = {
+  name: true,
+  street: true,
+  number: true,
+  neighborhood: true,
+  city: true,
+  state: true,
+} as const;
+
 export function findById(id: string) {
   return prisma.delivery.findUnique({
     where: { id },
-    include: { customer: { select: { name: true } } },
+    include: { customer: { select: customerSelect } },
   });
 }
 
@@ -16,7 +25,7 @@ export function updateStatus(id: string, status: DeliveryStatus, notes: string |
       notes: notes ?? "",
       deliveredAt: status === "DELIVERED" ? new Date() : null,
     },
-    include: { customer: { select: { name: true } } },
+    include: { customer: { select: customerSelect } },
   });
 }
 

@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "../src/auth/authContext";
 import { CustomersProvider } from "../src/customersContext";
 import { OrdersProvider } from "../src/ordersContext";
 import { ProductsProvider } from "../src/productsContext";
+import { RoutesProvider } from "../src/routesContext";
 import { colors } from "../src/theme";
 import type { AuthUser } from "../src/types";
 
@@ -55,16 +56,20 @@ function AppShell() {
     <CustomersProvider>
       <ProductsProvider>
         <OrdersProvider>
-          <Stack screenOptions={screenOptions}>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="novo" options={{ title: "Novo pedido" }} />
-            <Stack.Screen name="pedido/[id]" options={{ title: "Pedido" }} />
-            <Stack.Screen name="cliente/novo" options={{ title: "Novo cliente" }} />
-            <Stack.Screen name="cliente/[id]" options={{ title: "Cliente" }} />
-            <Stack.Screen name="clientes/importar" options={{ title: "Importar clientes" }} />
-            <Stack.Screen name="fechar-mes" options={{ title: "Fechar mês" }} />
-          </Stack>
+          <RoutesProvider>
+            <Stack screenOptions={screenOptions}>
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="novo" options={{ title: "Novo pedido" }} />
+              <Stack.Screen name="pedido/[id]" options={{ title: "Pedido" }} />
+              <Stack.Screen name="cliente/novo" options={{ title: "Novo cliente" }} />
+              <Stack.Screen name="cliente/[id]" options={{ title: "Cliente" }} />
+              <Stack.Screen name="clientes/importar" options={{ title: "Importar clientes" }} />
+              <Stack.Screen name="fechar-mes" options={{ title: "Fechar mês" }} />
+              <Stack.Screen name="rota/nova" options={{ title: "Nova rota" }} />
+              <Stack.Screen name="rota/[id]" options={{ title: "Rota" }} />
+            </Stack>
+          </RoutesProvider>
         </OrdersProvider>
       </ProductsProvider>
     </CustomersProvider>

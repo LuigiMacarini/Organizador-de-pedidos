@@ -1,8 +1,17 @@
 import type { RouteStatus } from "@prisma/client";
 import { prisma } from "./prismaClient.js";
 
+const customerSelect = {
+  name: true,
+  street: true,
+  number: true,
+  neighborhood: true,
+  city: true,
+  state: true,
+} as const;
+
 const include = {
-  deliveries: { include: { customer: { select: { name: true } } } },
+  deliveries: { include: { customer: { select: customerSelect } } },
 } as const;
 
 export function findById(id: string) {

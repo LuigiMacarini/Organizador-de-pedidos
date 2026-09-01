@@ -31,6 +31,8 @@ export type DeliveryDTO = {
   orderId: string;
   customerId: string;
   customerName: string;
+  /** Endereço formatado do cliente (rua/número - bairro, cidade, UF), para o entregador saber onde ir. */
+  address: string;
   sequence: number;
   destinationLat: number;
   destinationLng: number;
@@ -38,6 +40,14 @@ export type DeliveryDTO = {
   deliveredAt: number | null;
   notes: string;
 };
+
+type DeliveryCustomer = Pick<Customer, "name" | "street" | "number" | "neighborhood" | "city" | "state">;
+
+function formatAddress(customer: DeliveryCustomer): string {
+  const line1 = [customer.street, customer.number].filter(Boolean).join(", ");
+  const line2 = [customer.neighborhood, customer.city, customer.state].filter(Boolean).join(", ");
+  return [line1, line2].filter(Boolean).join(" — ");
+}
 
 export type RouteDTO = {
   id: string;
@@ -55,13 +65,14 @@ export type RouteDTO = {
   deliveries: DeliveryDTO[];
 };
 
-export function toDeliveryDTO(delivery: Delivery & { customer: Pick<Customer, "name"> }): DeliveryDTO {
+export function toDeliveryDTO(delivery: Delivery & { customer: DeliveryCustomer }): DeliveryDTO {
   return {
     id: delivery.id,
     routeId: delivery.routeId,
     orderId: delivery.orderId,
     customerId: delivery.customerId,
     customerName: delivery.customer.name,
+    address: formatAddress(delivery.customer),
     sequence: delivery.sequence,
     destinationLat: delivery.destinationLat,
     destinationLng: delivery.destinationLng,
@@ -72,7 +83,7 @@ export function toDeliveryDTO(delivery: Delivery & { customer: Pick<Customer, "n
 }
 
 export function toRouteDTO(
-  route: Route & { deliveries: (Delivery & { customer: Pick<Customer, "name"> })[] }
+  route: Route & { deliveries: (Delivery & { customer: DeliveryCustomer })[] }
 ): RouteDTO {
   return {
     id: route.id,

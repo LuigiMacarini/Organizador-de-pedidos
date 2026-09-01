@@ -23,8 +23,13 @@ export function normalizeName(name: string): string {
 export type CustomerInput = {
   name: string;
   phone?: string;
-  address?: string;
   note?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 };
 
 export type ImportResult = {

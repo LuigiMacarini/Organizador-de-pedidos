@@ -81,18 +81,26 @@ type RequestOptions = {
 };
 
 async function doFetch(base: string, path: string, options: RequestOptions, token: string | null) {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const method = options.method ?? "GET";
+  const headers: Record<string, string> = {};
+  // Só envia Content-Type quando há corpo de verdade — mandá-lo em requisições
+  // sem corpo (ex.: POST /start, /cancel, /archive) faz o Fastify rejeitar com
+  // FST_ERR_CTP_EMPTY_JSON_BODY, já que promete um JSON que nunca chega.
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
   try {
-    return await fetch(joinUrl(base, path), {
-      method: options.method ?? "GET",
+    const res = await fetch(joinUrl(base, path), {
+      method,
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
-  } catch {
+    console.log(`[API] ${method} ${path} -> ${res.status}`);
+    return res;
+  } catch (err) {
     // `fetch` rejeita (sem resposta HTTP nenhuma) quando o servidor está fora do ar,
     // o endereço está errado ou não há rede — diferente de um erro que o servidor
     // respondeu de propósito (ex.: 401 de senha errada).
+    console.error(`[API] ${method} ${path} -> falha de rede (servidor inalcançável)`, err);
     throw new NetworkError();
   }
 }
@@ -120,10 +128,27 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       onSessionExpired?.();
       throw new ApiError("Sessão expirada, faça login novamente", 401);
     }
-    res = await doFetch(base, path, options, refreshed);
+    token = refreshed;
+    res = await doFetch(base, path, options, token);
+  }
+
+  // O plano free do Render "dorme" o serviço após inatividade — a primeira
+  // requisição depois de um tempo parado às vezes falha (5xx) enquanto o
+  // servidor termina de acordar. Uma única tentativa extra resolve a maioria
+  // dos casos sem exigir ação do usuário.
+  if (res.status >= 500) {
+    console.warn(
+      `[API] ${options.method ?? "GET"} ${path} -> ${res.status}, tentando novamente em 2s (serviço pode estar acordando)`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    res = await doFetch(base, path, options, token);
   }
 
   if (res.status === 204) return undefined as T;
-  if (!res.ok) throw new ApiError(await readErrorMessage(res), res.status);
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    console.error(`[API] ${options.method ?? "GET"} ${path} -> erro ${res.status}: ${message}`);
+    throw new ApiError(message, res.status);
+  }
   return (await res.json()) as T;
 }
