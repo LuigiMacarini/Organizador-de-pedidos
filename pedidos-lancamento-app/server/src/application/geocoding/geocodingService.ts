@@ -3,11 +3,23 @@ import { geocodeAddress } from "../../infrastructure/external/routingClient.js";
 
 /**
  * Abaixo desse valor, o resultado é tratado como incerto (`PARTIAL`) em vez de
- * confirmado (`OK`). Sem base empírica ainda — calibrar observando os
- * primeiros clientes reais do ORG (endereços informais/rurais tendem a vir
- * com confiança mais baixa nesse provedor).
+ * confirmado (`OK`). Calibrado contra endereços reais do ORG: um endereço
+ * completo e existente bate com confiança 1.0; um resultado que caiu para o
+ * nível "cidade" (ver `PRECISE_LAYERS` abaixo) ainda chega perto de 0.6 —
+ * por isso a camada geográfica do resultado importa tanto quanto o número.
  */
 const CONFIDENCE_THRESHOLD = 0.5;
+
+/**
+ * Camadas geográficas específicas o bastante para serem a localização de um
+ * cliente. Testado contra o provedor real: um bairro que não bate
+ * exatamente com o indexado (ex.: "Centro", comum a qualquer cidade) faz a
+ * busca cair para `locality`/`region` — um ponto genérico no meio da cidade
+ * ou do estado — mas ainda com confiança alta o bastante pra passar no
+ * limiar acima sozinho. Por isso a camada é obrigatória, não só a confiança:
+ * nunca aceitar em silêncio um resultado "cidade" como se fosse um endereço.
+ */
+const PRECISE_LAYERS = new Set(["venue", "address", "street"]);
 
 /**
  * Geocodifica um cliente já salvo e grava o resultado. Nunca lança para o
@@ -38,8 +50,9 @@ export async function geocodeCustomer(customerId: string): Promise<void> {
       return;
     }
 
+    const isPrecise = result.confidence >= CONFIDENCE_THRESHOLD && PRECISE_LAYERS.has(result.layer);
     await customerRepository.setGeocodeResult(customerId, {
-      status: result.confidence >= CONFIDENCE_THRESHOLD ? "OK" : "PARTIAL",
+      status: isPrecise ? "OK" : "PARTIAL",
       latitude: result.latitude,
       longitude: result.longitude,
     });

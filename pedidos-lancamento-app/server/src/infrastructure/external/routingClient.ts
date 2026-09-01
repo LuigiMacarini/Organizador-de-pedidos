@@ -28,25 +28,39 @@ export type GeocodeResult = {
   confidence: number;
   /** Endereço formatado que o provedor efetivamente casou — útil para depuração/revisão manual. */
   label: string;
+  /**
+   * Nível geográfico do resultado (`venue`/`address`/`street` = específico;
+   * `neighbourhood`/`locality`/`region`/`country` = genérico demais para ser
+   * a localização de um cliente). Ver `geocodingService` — usado junto com a
+   * confiança pra nunca aceitar em silêncio um resultado no nível "cidade".
+   */
+  layer: string;
 };
 
 type PeliasFeatureCollection = {
   features?: Array<{
     geometry: { coordinates: [number, number] };
-    properties?: { confidence?: number; label?: string };
+    properties?: { confidence?: number; label?: string; layer?: string };
   }>;
 };
 
 /**
  * Geocodifica um endereço estruturado via `/geocode/search/structured`.
  * Retorna `null` quando o provedor não encontra nenhum resultado (não é erro).
+ *
+ * NÃO envia `neighbourhood` (bairro): testado e confirmado que o Pelias trata
+ * esse campo como filtro rígido — quando o bairro informado não bate
+ * exatamente com o indexado (comum com nomes genéricos tipo "Centro", que
+ * existem em qualquer cidade), a busca inteira falha no nível de rua e cai
+ * para o centro da cidade, ainda com confiança alta o bastante pra parecer
+ * um resultado bom. Sem o bairro, rua+número+cidade+UF sozinhos já bateram
+ * com confiança 1.0 nos testes feitos contra o provedor real.
  */
 export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeResult | null> {
   const params = new URLSearchParams({ api_key: apiKey(), size: "1", "boundary.country": "BRA" });
 
   const address = [input.street, input.number].filter(Boolean).join(", ");
   if (address) params.set("address", address);
-  if (input.neighborhood) params.set("neighbourhood", input.neighborhood);
   if (input.city) params.set("locality", input.city);
   if (input.state) params.set("region", input.state);
   if (input.zipCode) params.set("postalcode", input.zipCode);
@@ -66,6 +80,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     longitude,
     confidence: feature.properties?.confidence ?? 0,
     label: feature.properties?.label ?? "",
+    layer: feature.properties?.layer ?? "unknown",
   };
 }
 
