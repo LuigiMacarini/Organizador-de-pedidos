@@ -31,4 +31,8 @@ export default async function customerRoutes(app: FastifyInstance) {
     await customerService.remove(request.params.id);
     return reply.status(204).send();
   });
+
+  app.post<{ Params: { id: string } }>("/v1/customers/:id/geocode", async (request) => {
+    return customerService.regeocode(request.params.id);
+  });
 }

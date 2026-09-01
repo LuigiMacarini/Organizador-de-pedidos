@@ -4,8 +4,13 @@ import type { Customer } from "../types";
 export type CustomerInput = {
   name: string;
   phone?: string;
-  address?: string;
   note?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 };
 
 type Page<T> = { items: T[]; nextCursor: string | null };

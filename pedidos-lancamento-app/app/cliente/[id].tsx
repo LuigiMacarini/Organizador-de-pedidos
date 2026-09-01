@@ -41,6 +41,12 @@ export default function ClienteDetalheScreen() {
               name: customer.name,
               phone: customer.phone,
               note: customer.note,
+              street: customer.street,
+              number: customer.number,
+              neighborhood: customer.neighborhood,
+              city: customer.city,
+              state: customer.state,
+              zipCode: customer.zipCode,
             }}
             submitLabel="Salvar alterações"
             busy={busy}

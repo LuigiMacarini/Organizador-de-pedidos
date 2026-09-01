@@ -37,8 +37,9 @@ const ALL_STATUSES: OrderStatus[] = [
   "CANCELED",
 ];
 
+/** `deliverable` = pedidos PENDING com cliente geocodificado e sem entrega ativa (roteirização). */
 export const orderStatusFilterSchema = z
-  .enum(["pending", "archived", "all"])
+  .enum(["pending", "archived", "all", "deliverable"])
   .optional()
   .default("pending");
 

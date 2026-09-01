@@ -14,7 +14,9 @@ export type UpdateOrderInput = Partial<CreateOrderInput>;
 type Page<T> = { items: T[]; nextCursor: string | null };
 
 /** Ver nota em `customersRemote.ts` sobre o limite de página único. */
-export async function remoteListOrders(status: "pending" | "archived" | "all" = "pending"): Promise<Order[]> {
+export async function remoteListOrders(
+  status: "pending" | "archived" | "all" | "deliverable" = "pending"
+): Promise<Order[]> {
   const page = await apiRequest<Page<Order>>(`/v1/orders?status=${status}&limit=200`);
   return page.items;
 }

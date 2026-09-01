@@ -27,6 +27,27 @@ enum OrderStatus {
   CANCELED
 }
 
+/// Status da geocodificação do endereço do cliente (OpenRouteService).
+enum GeocodeStatus {
+  PENDING // endereço salvo, ainda não geocodificado
+  OK // lat/lng resolvidos com confiança
+  PARTIAL // resultado encontrado, mas com baixa confiança (revisar)
+  FAILED // não foi possível geocodificar (endereço incompleto ou não encontrado)
+}
+
+enum RouteStatus {
+  DRAFT // criada, ainda não iniciada pelo entregador
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -35,23 +56,38 @@ model User {
   role         Role     @default(EMPLOYEE)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  routes       Route[]
 }
 
 /// Cliente (deduplicado por nome normalizado em `nameKey`).
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  nameKey   String   @unique
+  id           String   @id @default(cuid())
+  name         String
+  nameKey      String   @unique
   /// Telefone ou WhatsApp.
-  phone     String   @default("")
-  /// Preparado para o app do Cliente; não usado pelo painel do Dono ainda.
-  address   String?
-  note      String   @default("")
+  phone        String   @default("")
+  note         String   @default("")
+
+  /// Endereço estruturado, usado para geocodificação (roteirização de entregas).
+  street       String?
+  number       String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+
+  latitude      Float?
+  longitude     Float?
+  geocodeStatus GeocodeStatus @default(PENDING)
+  geocodedAt    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
+  deliveries Delivery[]
 
   @@index([updatedAt])
+  @@index([geocodeStatus])
 }
 
 /// Catálogo administrável (substitui a lista fixa que vivia no bundle do app).
@@ -83,6 +119,7 @@ model Order {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   lines      OrderLine[]
+  deliveries Delivery[]
 
   @@index([customerId])
   @@index([updatedAt])
@@ -104,4 +141,63 @@ model OrderLine {
 
   @@index([orderId])
   @@index([productId])
+}
+
+/// Uma execução de entregas por um entregador. Agrupa `Delivery`s calculadas
+/// numa única chamada ao provedor de rotas (OpenRouteService).
+model Route {
+  id          String      @id @default(cuid())
+  delivererId String
+  deliverer   User        @relation(fields: [delivererId], references: [id])
+  status      RouteStatus @default(DRAFT)
+
+  originLabel String
+  originLat   Float
+  originLng   Float
+
+  totalDistanceMeters  Int?
+  totalDurationSeconds Int?
+  /// Polyline codificada (formato padrão Google/OSRM) do trajeto real devolvido
+  /// pelo OpenRouteService — usada para desenhar a rota no mapa dentro do app.
+  geometry             String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  deliveries Delivery[]
+
+  @@index([delivererId])
+  @@index([status])
+}
+
+/// Tentativa de entregar um pedido específico, dentro de uma rota, numa
+/// posição da sequência. Um pedido pode ter várias `Delivery`s ao longo do
+/// tempo (reentrega após falha), mas no máximo uma ativa (`PENDING`) por vez
+/// — garantido na aplicação, não no schema.
+model Delivery {
+  id      String @id @default(cuid())
+  routeId String
+  route   Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  sequence Int
+
+  /// Snapshot da coordenada do cliente no momento da criação da rota — uma
+  /// edição posterior do endereço não deve alterar uma entrega já roteirizada.
+  destinationLat Float
+  destinationLng Float
+
+  status      DeliveryStatus @default(PENDING)
+  deliveredAt DateTime?
+  notes       String         @default("")
+
+  @@index([routeId])
+  @@index([orderId])
 }

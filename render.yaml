@@ -25,3 +25,11 @@ services:
         sync: false
       - key: SEED_OWNER_NAME
         value: Dono
+      - key: ORS_API_KEY
+        sync: false
+      - key: COMPANY_ORIGIN_LAT
+        sync: false
+      - key: COMPANY_ORIGIN_LNG
+        sync: false
+      - key: COMPANY_ORIGIN_LABEL
+        sync: false
