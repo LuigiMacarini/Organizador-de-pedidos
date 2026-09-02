@@ -21,6 +21,10 @@ export async function remoteListOrders(
   return page.items;
 }
 
+export function remoteGetOrder(id: string): Promise<Order> {
+  return apiRequest<Order>(`/v1/orders/${id}`);
+}
+
 export function remoteCreateOrder(input: CreateOrderInput): Promise<Order> {
   return apiRequest<Order>("/v1/orders", { method: "POST", body: input });
 }

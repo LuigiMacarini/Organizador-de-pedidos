@@ -1,8 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/httpClient";
+import { OrderDetailsModal } from "../../src/components/OrderDetailsModal";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteMap, type MapStop } from "../../src/components/RouteMap";
 import { useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
@@ -37,6 +39,7 @@ export default function RotaDetalheScreen() {
   const [busy, setBusy] = useState(false);
   const [busyDeliveryId, setBusyDeliveryId] = useState<string | null>(null);
   const [focusedStopId, setFocusedStopId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -130,7 +133,17 @@ export default function RotaDetalheScreen() {
   const handleDeliveryStatus = async (deliveryId: string, status: "DELIVERED" | "FAILED") => {
     setBusyDeliveryId(deliveryId);
     try {
-      await updateDeliveryStatus(deliveryId, status);
+      // Manda a posição atual do GPS (se já tiver) para o backend recalcular
+      // km/tempo restantes a partir de onde o entregador está de verdade,
+      // não do depósito. Sem GPS ainda, o backend cai para o depósito sozinho.
+      await updateDeliveryStatus(
+        deliveryId,
+        status,
+        undefined,
+        deliveryPosition
+          ? { latitude: deliveryPosition.latitude, longitude: deliveryPosition.longitude }
+          : null
+      );
       await load();
     } catch (e) {
       Alert.alert("Entrega", e instanceof ApiError ? e.message : "Não foi possível atualizar a entrega.");
@@ -141,6 +154,7 @@ export default function RotaDetalheScreen() {
 
   const canStart = route.status === "DRAFT";
   const canCancel = route.status === "DRAFT" || route.status === "IN_PROGRESS";
+  const selectedAddress = route.deliveries.find((d) => d.orderId === selectedOrderId)?.address ?? null;
 
   return (
     <>
@@ -179,7 +193,7 @@ export default function RotaDetalheScreen() {
           {route.deliveries.map((delivery, index) => (
             <Pressable
               key={delivery.id}
-              onPress={() => setFocusedStopId(delivery.id)}
+              onPress={() => setSelectedOrderId(delivery.orderId)}
               style={[styles.stopCard, delivery.id === nextStopId && styles.stopCardNext]}
             >
               <View style={styles.stopHeader}>
@@ -206,6 +220,16 @@ export default function RotaDetalheScreen() {
                       : "Não entregue"}
                   </Text>
                 </View>
+                {/* Ação separada do toque no card (que abre o pedido) — evita dois
+                    comportamentos concorrentes no mesmo gesto. */}
+                <Pressable
+                  onPress={() => setFocusedStopId(delivery.id)}
+                  hitSlop={8}
+                  style={styles.mapFocusBtn}
+                  accessibilityLabel="Ver esta entrega no mapa"
+                >
+                  <Ionicons name="locate-outline" size={20} color={colors.primary} />
+                </Pressable>
               </View>
 
               {delivery.address ? <Text style={styles.stopAddress}>{delivery.address}</Text> : null}
@@ -249,6 +273,12 @@ export default function RotaDetalheScreen() {
           </View>
         ) : null}
       </SafeAreaView>
+
+      <OrderDetailsModal
+        orderId={selectedOrderId}
+        address={selectedAddress}
+        onClose={() => setSelectedOrderId(null)}
+      />
     </>
   );
 }
@@ -302,6 +332,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   stopHeader: { flexDirection: "row", alignItems: "center", gap: space.md },
+  mapFocusBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   stopNumber: {
     width: 32,
     height: 32,
