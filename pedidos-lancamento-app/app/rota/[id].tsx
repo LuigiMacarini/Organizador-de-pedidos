@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/httpClient";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -36,6 +36,7 @@ export default function RotaDetalheScreen() {
   const [loading, setLoading] = useState(!route);
   const [busy, setBusy] = useState(false);
   const [busyDeliveryId, setBusyDeliveryId] = useState<string | null>(null);
+  const [focusedStopId, setFocusedStopId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -73,11 +74,9 @@ export default function RotaDetalheScreen() {
       })),
     [route]
   );
-  const {
-    permission: locationPermission,
-    position: deliveryPosition,
-    error: locationError,
-  } = useDeliveryLocation(canExecute);
+  // O card técnico com lat/lng/precisão foi removido da UI — o GPS continua
+  // rodando aqui só para alimentar o marcador "você está aqui" no mapa.
+  const { position: deliveryPosition } = useDeliveryLocation(canExecute);
 
   if (loading || !route) {
     return (
@@ -161,6 +160,7 @@ export default function RotaDetalheScreen() {
                 ? { lat: deliveryPosition.latitude, lng: deliveryPosition.longitude }
                 : null
             }
+            focusedStopId={focusedStopId}
             height={260}
           />
         </View>
@@ -176,31 +176,10 @@ export default function RotaDetalheScreen() {
             <Text style={styles.originText}>Origem: {route.originLabel}</Text>
           </View>
 
-          {canExecute ? (
-            <View style={styles.gpsCard}>
-              <Text style={styles.gpsLabel}>Localização</Text>
-              {locationPermission === "services-disabled" ? (
-                <Text style={styles.gpsWarning}>Ative o GPS do celular para acompanhar sua posição.</Text>
-              ) : locationPermission === "denied" ? (
-                <Text style={styles.gpsWarning}>
-                  Permissão de localização negada — sem ela não é possível acompanhar sua posição na rota.
-                </Text>
-              ) : locationError ? (
-                <Text style={styles.gpsWarning}>{locationError}</Text>
-              ) : deliveryPosition ? (
-                <Text style={styles.gpsValue}>
-                  {deliveryPosition.latitude.toFixed(5)}, {deliveryPosition.longitude.toFixed(5)}
-                  {deliveryPosition.accuracy ? ` (±${Math.round(deliveryPosition.accuracy)}m)` : ""}
-                </Text>
-              ) : (
-                <Text style={styles.gpsValue}>Obtendo localização…</Text>
-              )}
-            </View>
-          ) : null}
-
           {route.deliveries.map((delivery, index) => (
-            <View
+            <Pressable
               key={delivery.id}
+              onPress={() => setFocusedStopId(delivery.id)}
               style={[styles.stopCard, delivery.id === nextStopId && styles.stopCardNext]}
             >
               <View style={styles.stopHeader}>
@@ -249,7 +228,7 @@ export default function RotaDetalheScreen() {
                   />
                 </View>
               ) : null}
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
 
@@ -310,23 +289,6 @@ const styles = StyleSheet.create({
   },
   summaryMeta: { fontSize: 14, color: colors.muted, fontWeight: "600" },
   originText: { fontSize: 15, color: colors.text, fontWeight: "600" },
-  gpsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: space.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 4,
-  },
-  gpsLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  gpsValue: { fontSize: 14, color: colors.text, fontWeight: "600" },
-  gpsWarning: { fontSize: 14, color: colors.danger, lineHeight: 20 },
   stopCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

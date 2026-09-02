@@ -16,5 +16,7 @@ export type RouteMapProps = {
   nextStopId?: string | null;
   /** Posição atual do entregador (GPS). */
   currentPosition?: { lat: number; lng: number } | null;
+  /** Id da entrega selecionada pelo entregador — centraliza o mapa nela (zoom de bairro), sem refazer o enquadramento da rota inteira. */
+  focusedStopId?: string | null;
   height?: number;
 };

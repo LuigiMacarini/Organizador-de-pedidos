@@ -25,7 +25,15 @@ function stopColor(stop: MapStop, isNext: boolean): string {
  * Versão só para Android/iOS (Metro resolve `.native.tsx` automaticamente
  * nessas plataformas) — react-native-maps não roda na web, ver RouteMap.web.tsx.
  */
-export function RouteMap({ origin, stops, geometry, nextStopId, currentPosition, height = 320 }: RouteMapProps) {
+export function RouteMap({
+  origin,
+  stops,
+  geometry,
+  nextStopId,
+  currentPosition,
+  focusedStopId,
+  height = 320,
+}: RouteMapProps) {
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -47,6 +55,21 @@ export function RouteMap({ origin, stops, geometry, nextStopId, currentPosition,
       animated: false,
     });
   }, [mapReady, path, origin.lat, origin.lng]);
+
+  // Centraliza numa entrega específica quando o entregador toca no card dela
+  // — só move a câmera (mesmo mapa, mesmos marcadores). Depende só do id
+  // selecionado, não da lista de paradas: se o status de uma entrega mudar
+  // enquanto ela está em foco, a câmera não deve pular sozinha.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !focusedStopId) return;
+    const target = stops.find((s) => s.id === focusedStopId);
+    if (!target) return;
+    mapRef.current.animateToRegion(
+      { latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+      400
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedStopId, mapReady]);
 
   return (
     <View style={[styles.wrap, { height }]}>
