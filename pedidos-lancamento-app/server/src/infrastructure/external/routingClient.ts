@@ -125,27 +125,16 @@ type ComputeRoutesResponse = {
   }>;
 };
 
-/**
- * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` e
- * retornando a ela (viagem de ida e volta ao depósito). Usa a Routes API
- * (`computeRoutes`) com `optimizeWaypointOrder: true`.
- */
-export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
-  if (stops.length === 0) {
-    throw new Error("optimizeRoute chamado sem nenhuma parada");
-  }
+function toWaypoint(c: Coordinate) {
+  return { location: { latLng: { latitude: c.latitude, longitude: c.longitude } } };
+}
 
-  const toWaypoint = (c: Coordinate) => ({
-    location: { latLng: { latitude: c.latitude, longitude: c.longitude } },
-  });
-
-  const body = {
-    origin: toWaypoint(origin),
-    destination: toWaypoint(origin),
-    intermediates: stops.map(toWaypoint),
-    travelMode: "DRIVE",
-    optimizeWaypointOrder: true,
-  };
+/** POST cru em `computeRoutes` — compartilhado por `optimizeRoute` e `computeRouteMetrics`, mesma API/chave/field mask. */
+async function callComputeRoutes(body: Record<string, unknown>): Promise<NonNullable<ComputeRoutesResponse["routes"]>[number]> {
+  const intermediates = Array.isArray(body.intermediates) ? body.intermediates.length : 0;
+  console.log(
+    `[Google Routes] computeRoutes chamado — optimizeWaypointOrder=${body.optimizeWaypointOrder}, paradas=${intermediates}`
+  );
 
   const res = await fetch(ROUTES_URL, {
     method: "POST",
@@ -167,6 +156,26 @@ export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Pro
   if (!route) {
     throw new Error("Google Routes não retornou nenhuma rota viável");
   }
+  return route;
+}
+
+/**
+ * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` e
+ * retornando a ela (viagem de ida e volta ao depósito). Usa a Routes API
+ * (`computeRoutes`) com `optimizeWaypointOrder: true`.
+ */
+export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
+  if (stops.length === 0) {
+    throw new Error("optimizeRoute chamado sem nenhuma parada");
+  }
+
+  const route = await callComputeRoutes({
+    origin: toWaypoint(origin),
+    destination: toWaypoint(origin),
+    intermediates: stops.map(toWaypoint),
+    travelMode: "DRIVE",
+    optimizeWaypointOrder: true,
+  });
 
   const orderIndexes = route.optimizedIntermediateWaypointIndex ?? stops.map((_, i) => i);
   const order = orderIndexes.map((i) => stops[i].refId);
@@ -174,6 +183,42 @@ export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Pro
 
   return {
     order,
+    totalDistanceMeters: route.distanceMeters ?? 0,
+    totalDurationSeconds: durationSeconds,
+    geometry: route.polyline?.encodedPolyline ?? null,
+  };
+}
+
+export type RouteMetrics = {
+  totalDistanceMeters: number;
+  totalDurationSeconds: number;
+  geometry: string | null;
+};
+
+/**
+ * Distância/duração/geometria para uma sequência de paradas JÁ DEFINIDA, sem
+ * reotimizar a ordem (`optimizeWaypointOrder: false`) — usado para recalcular
+ * o restante de uma rota em andamento depois que uma entrega é concluída.
+ * Reotimizar a sequência é feature futura; aqui só medimos o trajeto que já
+ * está decidido. Fecha em `destination` — mesma definição de "distância/tempo
+ * total" usada na criação da rota (round-trip até o depósito).
+ */
+export async function computeRouteMetrics(
+  origin: Coordinate,
+  orderedStops: Coordinate[],
+  destination: Coordinate
+): Promise<RouteMetrics> {
+  const route = await callComputeRoutes({
+    origin: toWaypoint(origin),
+    destination: toWaypoint(destination),
+    intermediates: orderedStops.map(toWaypoint),
+    travelMode: "DRIVE",
+    optimizeWaypointOrder: false,
+  });
+
+  const durationSeconds = route.duration ? Math.round(parseFloat(route.duration.replace("s", ""))) : 0;
+
+  return {
     totalDistanceMeters: route.distanceMeters ?? 0,
     totalDurationSeconds: durationSeconds,
     geometry: route.polyline?.encodedPolyline ?? null,

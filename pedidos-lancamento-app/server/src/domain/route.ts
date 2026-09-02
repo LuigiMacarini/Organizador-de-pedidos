@@ -19,6 +19,9 @@ export type CreateRouteInput = z.infer<typeof createRouteInputSchema>;
 export const updateDeliveryStatusInputSchema = z.object({
   status: z.enum(["DELIVERED", "FAILED"]),
   notes: z.string().trim().optional(),
+  /** Posição atual do entregador (GPS), se disponível — usada para recalcular o restante da rota a partir de onde ele está de verdade, não do depósito. */
+  currentLat: z.number().optional(),
+  currentLng: z.number().optional(),
 });
 
 export type UpdateDeliveryStatusInput = z.infer<typeof updateDeliveryStatusInputSchema>;
