@@ -27,7 +27,12 @@ type RoutesContextValue = {
   getRoute: (id: string) => Promise<DeliveryRoute>;
   startRoute: (id: string) => Promise<DeliveryRoute>;
   cancelRoute: (id: string) => Promise<DeliveryRoute>;
-  updateDeliveryStatus: (deliveryId: string, status: "DELIVERED" | "FAILED", notes?: string) => Promise<void>;
+  updateDeliveryStatus: (
+    deliveryId: string,
+    status: "DELIVERED" | "FAILED",
+    notes?: string,
+    currentPosition?: { latitude: number; longitude: number } | null
+  ) => Promise<void>;
   clearHistory: () => Promise<number>;
 };
 
@@ -84,8 +89,13 @@ export function RoutesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateDeliveryStatus = useCallback(
-    async (deliveryId: string, status: "DELIVERED" | "FAILED", notes?: string) => {
-      await remoteUpdateDeliveryStatus(deliveryId, status, notes);
+    async (
+      deliveryId: string,
+      status: "DELIVERED" | "FAILED",
+      notes?: string,
+      currentPosition?: { latitude: number; longitude: number } | null
+    ) => {
+      await remoteUpdateDeliveryStatus(deliveryId, status, notes, currentPosition);
     },
     []
   );

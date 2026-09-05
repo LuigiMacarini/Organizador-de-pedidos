@@ -88,6 +88,14 @@ export function setStatus(
   });
 }
 
+/** Atualiza distância/duração/geometria — recálculo do restante da rota após uma entrega ser concluída/falhar. */
+export function updateMetrics(
+  id: string,
+  data: { totalDistanceMeters: number; totalDurationSeconds: number; geometry: string | null }
+) {
+  return prisma.route.update({ where: { id }, data });
+}
+
 /**
  * Remove definitivamente rotas já encerradas (COMPLETED/CANCELED) — usado por
  * "Limpar histórico". As `Delivery`s são apagadas em cascata (`onDelete: Cascade`
@@ -96,6 +104,11 @@ export function setStatus(
  */
 export function deleteFinished() {
   return prisma.route.deleteMany({ where: { status: { in: ["COMPLETED", "CANCELED"] } } });
+}
+
+/** Remove uma única rota (mesma restrição de status é aplicada no service, não aqui). */
+export function remove(id: string) {
+  return prisma.route.delete({ where: { id } });
 }
 
 /** Devolve os pedidos da rota para `PENDING` — usado ao cancelar uma rota. */

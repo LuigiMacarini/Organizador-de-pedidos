@@ -11,6 +11,9 @@ export type CustomerInput = {
   city?: string;
   state?: string;
   zipCode?: string;
+  /** Só presente quando o endereço veio do Places Autocomplete (já geocodificado). */
+  latitude?: number;
+  longitude?: number;
 };
 
 type Page<T> = { items: T[]; nextCursor: string | null };

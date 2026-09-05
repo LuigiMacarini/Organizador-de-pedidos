@@ -16,6 +16,13 @@ export const customerInputSchema = z.object({
   city: z.string().trim().optional(),
   state: z.string().trim().optional(),
   zipCode: z.string().trim().optional(),
+  /**
+   * Presentes só quando o endereço veio do Places Autocomplete (já
+   * geocodificado com precisão pela própria Google) — nesse caso o backend
+   * reaproveita a coordenada em vez de geocodificar de novo. Ver `customerService`.
+   */
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export type CustomerInput = z.infer<typeof customerInputSchema>;

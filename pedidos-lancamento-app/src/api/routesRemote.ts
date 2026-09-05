@@ -36,10 +36,24 @@ export function remoteClearRouteHistory(): Promise<{ deleted: number }> {
   return apiRequest<{ deleted: number }>("/v1/routes/clear-history", { method: "POST" });
 }
 
+/** Exclui uma única rota já encerrada — alternativa cirúrgica ao "limpar histórico". */
+export function remoteDeleteRoute(id: string): Promise<void> {
+  return apiRequest<void>(`/v1/routes/${id}`, { method: "DELETE" });
+}
+
 export function remoteUpdateDeliveryStatus(
   id: string,
   status: "DELIVERED" | "FAILED",
-  notes?: string
+  notes?: string,
+  currentPosition?: { latitude: number; longitude: number } | null
 ): Promise<Delivery> {
-  return apiRequest<Delivery>(`/v1/deliveries/${id}`, { method: "PATCH", body: { status, notes } });
+  return apiRequest<Delivery>(`/v1/deliveries/${id}`, {
+    method: "PATCH",
+    body: {
+      status,
+      notes,
+      currentLat: currentPosition?.latitude,
+      currentLng: currentPosition?.longitude,
+    },
+  });
 }

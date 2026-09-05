@@ -33,3 +33,12 @@ export function updateStatus(id: string, status: DeliveryStatus, notes: string |
 export function countPending(routeId: string) {
   return prisma.delivery.count({ where: { routeId, status: "PENDING" } });
 }
+
+/** Entregas ainda pendentes de uma rota, na sequência já decidida — usado para recalcular o restante (sem reotimizar ordem). */
+export function listPendingByRoute(routeId: string) {
+  return prisma.delivery.findMany({
+    where: { routeId, status: "PENDING" },
+    orderBy: { sequence: "asc" },
+    select: { destinationLat: true, destinationLng: true },
+  });
+}

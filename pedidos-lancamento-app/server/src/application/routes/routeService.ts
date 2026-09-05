@@ -129,6 +129,15 @@ export async function clearHistory() {
   return { deleted: result.count };
 }
 
+/** Exclui uma única rota já encerrada — alternativa cirúrgica ao "limpar histórico" (que apaga todas de uma vez). */
+export async function remove(id: string) {
+  const route = await get(id);
+  if (route.status !== "COMPLETED" && route.status !== "CANCELED") {
+    throw new AppError("Só é possível excluir rotas já encerradas (concluídas ou canceladas)", 409);
+  }
+  await routeRepository.remove(id);
+}
+
 export async function cancel(id: string) {
   const route = await get(id);
   if (route.status === "COMPLETED" || route.status === "CANCELED") {
