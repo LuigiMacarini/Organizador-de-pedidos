@@ -13,8 +13,8 @@ module.exports = () => ({
     [
       "@sentry/react-native",
       {
-        organization: "org-performance-sentry",
-        project: "luigi-w1",
+        organization: "luigi-w1",
+        project: "org-performance-sentry",
         // O token de upload NÃO vai aqui — o próprio plugin avisa que isso é
         // inseguro (fica exposto na config resolvida). Ele é lido direto de
         // SENTRY_AUTH_TOKEN no ambiente do build (EAS secret), sem passar
