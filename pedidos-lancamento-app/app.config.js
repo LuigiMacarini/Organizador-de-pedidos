@@ -8,6 +8,20 @@ const appJson = require("./app.json");
  */
 module.exports = () => ({
   ...appJson.expo,
+  plugins: [
+    ...appJson.expo.plugins,
+    [
+      "@sentry/react-native",
+      {
+        organization: "org-performance-sentry",
+        project: "luigi-w1",
+        // O token de upload NÃO vai aqui — o próprio plugin avisa que isso é
+        // inseguro (fica exposto na config resolvida). Ele é lido direto de
+        // SENTRY_AUTH_TOKEN no ambiente do build (EAS secret), sem passar
+        // pelo JS deste arquivo.
+      },
+    ],
+  ],
   android: {
     ...appJson.expo.android,
     config: {

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -10,6 +11,21 @@ import { ProductsProvider } from "../src/productsContext";
 import { RoutesProvider } from "../src/routesContext";
 import { colors } from "../src/theme";
 import type { AuthUser } from "../src/types";
+
+/**
+ * 100% de amostragem (tracing + profiling) — deliberado, é a janela de
+ * coleta do estudo de performance do TCC (ver protocolo). Reduzir depois
+ * que o experimento acabar, para não gastar quota à toa em uso normal.
+ * Sem DSN (ex.: build sem a variável configurada), o SDK só fica inativo,
+ * não quebra o app.
+ */
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  profilesSampleRate: 1.0,
+  enableAppStartTracking: true,
+  enableNativeFramesTracking: true,
+});
 
 const screenOptions = {
   headerShadowVisible: false,
@@ -76,7 +92,7 @@ function AppShell() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
@@ -86,3 +102,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);
