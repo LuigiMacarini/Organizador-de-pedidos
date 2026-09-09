@@ -1,5 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { decodePolyline } from "../utils/polyline";
 import { colors, radii } from "../theme";
@@ -64,12 +65,47 @@ export function RouteMap({
     if (!mapReady || !mapRef.current || !focusedStopId) return;
     const target = stops.find((s) => s.id === focusedStopId);
     if (!target) return;
+    setFollowing(false);
     mapRef.current.animateToRegion(
       { latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
       400
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedStopId, mapReady]);
+
+  // "Seguir o veículo": liga sozinho assim que a primeira posição de GPS
+  // chega (início da navegação) — não a cada atualização, só na entrada no
+  // modo. Arrastar o mapa manualmente ou focar uma parada específica desliga
+  // (o entregador tomou controle); o botão de recentralizar liga de novo.
+  const [following, setFollowing] = useState(false);
+  const hadPositionRef = useRef(false);
+
+  useEffect(() => {
+    if (currentPosition && !hadPositionRef.current) {
+      hadPositionRef.current = true;
+      setFollowing(true);
+    } else if (!currentPosition) {
+      hadPositionRef.current = false;
+      setFollowing(false);
+    }
+  }, [currentPosition]);
+
+  useEffect(() => {
+    if (!following || !currentPosition || !mapReady || !mapRef.current) return;
+    mapRef.current.animateCamera(
+      { center: { latitude: currentPosition.lat, longitude: currentPosition.lng }, zoom: 17 },
+      { duration: 500 }
+    );
+  }, [following, currentPosition, mapReady]);
+
+  const handleRecenter = () => {
+    if (!currentPosition || !mapRef.current) return;
+    setFollowing(true);
+    mapRef.current.animateCamera(
+      { center: { latitude: currentPosition.lat, longitude: currentPosition.lng }, zoom: 17 },
+      { duration: 500 }
+    );
+  };
 
   return (
     <View style={[styles.wrap, { height }]}>
@@ -84,6 +120,7 @@ export function RouteMap({
           longitudeDelta: 0.05,
         }}
         onMapReady={() => setMapReady(true)}
+        onPanDrag={() => setFollowing(false)}
       >
         <Marker
           coordinate={{ latitude: origin.lat, longitude: origin.lng }}
@@ -141,6 +178,12 @@ export function RouteMap({
 
         {path.length > 1 ? <Polyline coordinates={path} strokeColor={colors.primary} strokeWidth={4} /> : null}
       </MapView>
+
+      {currentPosition && !following ? (
+        <Pressable onPress={handleRecenter} style={styles.recenterBtn} accessibilityLabel="Voltar para minha localização">
+          <Ionicons name="locate" size={22} color={colors.primary} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -191,4 +234,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   vehicleMarkerText: { fontSize: 17 },
+  recenterBtn: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
 });

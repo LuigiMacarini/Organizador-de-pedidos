@@ -8,6 +8,7 @@ import { OrderDetailsModal } from "../../src/components/OrderDetailsModal";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteMap, type MapStop } from "../../src/components/RouteMap";
 import { getCurrentDeliveryPosition, useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
+import { useNavigationAnnouncements } from "../../src/hooks/useNavigationAnnouncements";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
@@ -40,6 +41,7 @@ export default function RotaDetalheScreen() {
   const [busyDeliveryId, setBusyDeliveryId] = useState<string | null>(null);
   const [focusedStopId, setFocusedStopId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [voiceMuted, setVoiceMuted] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -80,6 +82,25 @@ export default function RotaDetalheScreen() {
   // O card técnico com lat/lng/precisão foi removido da UI — o GPS continua
   // rodando aqui só para alimentar o marcador "você está aqui" no mapa.
   const { position: deliveryPosition } = useDeliveryLocation(canExecute);
+
+  const nextStopForVoice = useMemo(() => {
+    const stop = route?.deliveries.find((d) => d.id === nextStopId);
+    if (!stop) return null;
+    return {
+      id: stop.id,
+      lat: stop.destinationLat,
+      lng: stop.destinationLng,
+      customerName: stop.customerName,
+    };
+  }, [route, nextStopId]);
+
+  // Navegação por voz simplificada (ver limitações no hook) — só ativa
+  // durante uma rota em execução, igual o rastreamento contínuo de GPS.
+  useNavigationAnnouncements(
+    canExecute ? nextStopForVoice : null,
+    deliveryPosition ? { latitude: deliveryPosition.latitude, longitude: deliveryPosition.longitude } : null,
+    voiceMuted
+  );
 
   if (loading || !route) {
     return (
@@ -197,9 +218,24 @@ export default function RotaDetalheScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
               <Text style={styles.statusBadge}>{STATUS_LABEL[route.status]}</Text>
-              <Text style={styles.summaryMeta}>
-                {formatDistance(route.totalDistanceMeters)} · {formatDuration(route.totalDurationSeconds)}
-              </Text>
+              <View style={styles.summaryTopRight}>
+                <Text style={styles.summaryMeta}>
+                  {formatDistance(route.totalDistanceMeters)} · {formatDuration(route.totalDurationSeconds)}
+                </Text>
+                {canExecute ? (
+                  <Pressable
+                    onPress={() => setVoiceMuted((prev) => !prev)}
+                    hitSlop={8}
+                    accessibilityLabel={voiceMuted ? "Ativar voz da navegação" : "Silenciar voz da navegação"}
+                  >
+                    <Ionicons
+                      name={voiceMuted ? "volume-mute-outline" : "volume-high-outline"}
+                      size={20}
+                      color={colors.muted}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
             <Text style={styles.originText}>Origem: {route.originLabel}</Text>
           </View>
@@ -324,6 +360,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   summaryTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  summaryTopRight: { flexDirection: "row", alignItems: "center", gap: space.sm },
   statusBadge: {
     fontSize: 12,
     fontWeight: "800",
