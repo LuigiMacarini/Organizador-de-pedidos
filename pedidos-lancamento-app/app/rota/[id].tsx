@@ -206,7 +206,11 @@ export default function RotaDetalheScreen() {
             nextStopId={nextStopId}
             currentPosition={
               deliveryPosition
-                ? { lat: deliveryPosition.latitude, lng: deliveryPosition.longitude }
+                ? {
+                    lat: deliveryPosition.latitude,
+                    lng: deliveryPosition.longitude,
+                    heading: deliveryPosition.heading,
+                  }
                 : null
             }
             focusedStopId={focusedStopId}

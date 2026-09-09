@@ -1,7 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import MapView, {
+  AnimatedRegion,
+  Marker,
+  MarkerAnimated,
+  Polyline,
+  PROVIDER_GOOGLE,
+  type MapMarker,
+} from "react-native-maps";
 import { decodePolyline } from "../utils/polyline";
 import { colors, radii } from "../theme";
 import type { MapStop, RouteMapProps } from "./RouteMap.types";
@@ -98,6 +105,53 @@ export function RouteMap({
     );
   }, [following, currentPosition, mapReady]);
 
+  // Suavização visual do marcador do veículo: sem isso, cada atualização de
+  // GPS (a cada ~5s) faz o ícone "pular" de uma posição pra outra — em
+  // rodovia, o carro real anda 100m+ nesse intervalo. Isso só anima a
+  // TRANSIÇÃO entre duas posições reais já confirmadas pelo GPS — nunca
+  // inventa/extrapola uma posição que o GPS não relatou. Android e iOS
+  // exigem APIs diferentes do react-native-maps para animação nativa de
+  // marcador (não são intercambiáveis).
+  const vehicleMarkerRef = useRef<MapMarker>(null);
+  const initialVehicleCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const animatedVehicleRegion = useRef(
+    new AnimatedRegion({ latitude: 0, longitude: 0, latitudeDelta: 0, longitudeDelta: 0 })
+  ).current;
+
+  useEffect(() => {
+    if (!currentPosition) return;
+    const coordinate = { latitude: currentPosition.lat, longitude: currentPosition.lng };
+
+    if (!initialVehicleCoordRef.current) {
+      // Primeira posição desta sessão: define direto, não há de onde animar.
+      initialVehicleCoordRef.current = coordinate;
+      animatedVehicleRegion.setValue({ ...coordinate, latitudeDelta: 0, longitudeDelta: 0 });
+      return;
+    }
+
+    if (Platform.OS === "android") {
+      vehicleMarkerRef.current?.animateMarkerToCoordinate(coordinate, 1000);
+    } else {
+      // O .d.ts pede `toValue`, mas a implementação real (lib/AnimatedRegion.js)
+      // ignora esse campo e anima cada latitude/longitude/delta individualmente
+      // a partir das próprias chaves do objeto — checado direto no fonte
+      // instalado. O cast é só pra contornar essa tipagem incompleta.
+      animatedVehicleRegion
+        .timing({
+          ...coordinate,
+          latitudeDelta: 0,
+          longitudeDelta: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        } as unknown as Parameters<typeof animatedVehicleRegion.timing>[0])
+        .start();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPosition?.lat, currentPosition?.lng]);
+
+  const vehicleRotation =
+    currentPosition?.heading != null && currentPosition.heading >= 0 ? currentPosition.heading : undefined;
+
   const handleRecenter = () => {
     if (!currentPosition || !mapRef.current) return;
     setFollowing(true);
@@ -162,18 +216,37 @@ export function RouteMap({
           );
         })}
 
-        {currentPosition ? (
-          <Marker
-            coordinate={{ latitude: currentPosition.lat, longitude: currentPosition.lng }}
-            title="Você está aqui"
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-            zIndex={999}
-          >
-            <View style={styles.vehicleMarker}>
-              <Text style={styles.vehicleMarkerText}>{"\u{1F697}"}</Text>
-            </View>
-          </Marker>
+        {currentPosition && initialVehicleCoordRef.current ? (
+          Platform.OS === "android" ? (
+            <Marker
+              ref={vehicleMarkerRef}
+              coordinate={initialVehicleCoordRef.current}
+              title="Você está aqui"
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              rotation={vehicleRotation}
+              zIndex={999}
+            >
+              <View style={styles.vehicleMarker}>
+                <Text style={styles.vehicleMarkerText}>{"\u{1F697}"}</Text>
+              </View>
+            </Marker>
+          ) : (
+            <MarkerAnimated
+              // Mesma tipagem incompleta do react-native-maps (AnimatedRegion é
+              // exatamente o tipo esperado em uso real/documentado pela lib).
+              coordinate={animatedVehicleRegion as unknown as { latitude: number; longitude: number }}
+              title="Você está aqui"
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              rotation={vehicleRotation}
+              zIndex={999}
+            >
+              <View style={styles.vehicleMarker}>
+                <Text style={styles.vehicleMarkerText}>{"\u{1F697}"}</Text>
+              </View>
+            </MarkerAnimated>
+          )
         ) : null}
 
         {path.length > 1 ? <Polyline coordinates={path} strokeColor={colors.primary} strokeWidth={4} /> : null}

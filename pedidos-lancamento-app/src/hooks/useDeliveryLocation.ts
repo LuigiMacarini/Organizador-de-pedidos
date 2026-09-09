@@ -11,6 +11,10 @@ export type DeliveryPosition = {
   latitude: number;
   longitude: number;
   accuracy: number | null;
+  /** Direção do deslocamento em graus (0 = norte, sentido horário). `null`/negativo quando o dispositivo não consegue determinar (ex.: parado). */
+  heading: number | null;
+  /** Velocidade instantânea em m/s. */
+  speed: number | null;
   timestamp: number;
 };
 
@@ -63,7 +67,14 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
 
       subscriptionRef.current = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.Balanced,
+          // Balanced (nível 3 de 6) é documentado como "accurate to within one
+          // hundred meters" — insuficiente pra navegação em rodovia (o carro
+          // aparecia em rua paralela). BestForNavigation é o nível que a própria
+          // expo-location descreve como pensado pra isso, usando sensores
+          // adicionais. Custa mais bateria — trade-off deliberado, documentado
+          // na conversa. timeInterval/distanceInterval não mudaram: o "pulo"
+          // visual é resolvido com suavização no mapa, não com mais polling.
+          accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: 5000,
           distanceInterval: 15,
         },
@@ -73,6 +84,8 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
             accuracy: loc.coords.accuracy,
+            heading: loc.coords.heading,
+            speed: loc.coords.speed,
             timestamp: loc.timestamp,
           });
         }
@@ -111,7 +124,10 @@ export async function getCurrentDeliveryPosition(): Promise<CurrentPositionResul
   if (status !== "granted") return { ok: false, reason: "denied" };
 
   try {
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    // Leitura única — custo de bateria de usar a precisão máxima aqui é
+    // irrelevante (não é contínuo), e essa coordenada vira a origem real da
+    // rota no Google Routes, então vale a pena ser a mais precisa possível.
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
     return {
       ok: true,
       latitude: loc.coords.latitude,
