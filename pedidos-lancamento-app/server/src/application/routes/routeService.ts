@@ -1,8 +1,12 @@
 import * as routeRepository from "../../infrastructure/db/routeRepository.js";
 import * as orderRepository from "../../infrastructure/db/orderRepository.js";
-import { optimizeRoute, type RouteStop } from "../../infrastructure/external/routingClient.js";
+import {
+  computeRouteMetrics,
+  optimizeRoute,
+  type RouteStop,
+} from "../../infrastructure/external/routingClient.js";
 import { AppError, NotFoundError } from "../../domain/errors.js";
-import { toRouteDTO, type CreateRouteInput } from "../../domain/route.js";
+import { toRouteDTO, type CreateRouteInput, type StartRouteInput } from "../../domain/route.js";
 import { toPage, type PaginationQuery } from "../../domain/pagination.js";
 
 type Origin = { lat: number; lng: number; label: string };
@@ -114,12 +118,61 @@ export async function create(input: CreateRouteInput, delivererId: string) {
   return toRouteDTO(route);
 }
 
-export async function start(id: string) {
-  const route = await get(id);
+/**
+ * "Null Island" (0,0) é o valor que aparece quando uma leitura de GPS falha
+ * silenciosamente em algumas plataformas — nunca é uma posição real de
+ * entregador. Rejeitar objetivamente isso (e não-finitos) evita usar uma
+ * coordenada claramente inválida como origem, sem inventar um limiar de
+ * precisão arbitrário (esse não temos como justificar sem dado real).
+ */
+function isPlausibleCoordinate(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
+}
+
+/**
+ * A origem real da rota passa a ser a posição do GPS no momento de iniciar,
+ * não mais a origem fixa/depósito usada na criação (essa continua existindo
+ * só como destino de retorno). Reotimizar a ORDEM das paradas não é o
+ * objetivo aqui — a sequência decidida na criação é preservada; só a
+ * distância/duração/geometria são recalculadas a partir da posição real via
+ * `computeRouteMetrics` (mesma função já usada no recálculo após cada
+ * entrega, nenhuma implementação nova do Google Routes).
+ */
+export async function start(id: string, input: StartRouteInput) {
+  const route = await routeRepository.findById(id);
+  if (!route) throw new NotFoundError("Rota não encontrada");
   if (route.status !== "DRAFT") {
     throw new AppError("Só é possível iniciar uma rota que ainda não começou", 409);
   }
-  const updated = await routeRepository.setStatus(id, "IN_PROGRESS", { startedAt: new Date() });
+  if (!isPlausibleCoordinate(input.currentLat, input.currentLng)) {
+    throw new AppError("Localização atual inválida — não foi possível iniciar a rota", 400);
+  }
+
+  try {
+    const orderedStops = route.deliveries
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((d) => ({ latitude: d.destinationLat, longitude: d.destinationLng }));
+
+    if (orderedStops.length > 0) {
+      const metrics = await computeRouteMetrics(
+        { latitude: input.currentLat, longitude: input.currentLng },
+        orderedStops,
+        { latitude: route.originLat, longitude: route.originLng }
+      );
+      await routeRepository.updateMetrics(id, metrics);
+    }
+  } catch {
+    // Falha no Google Routes não pode impedir o entregador de começar a
+    // trabalhar — segue com as métricas antigas (mesmo modo degradado usado
+    // na criação da rota e no recálculo por entrega).
+  }
+
+  const updated = await routeRepository.setStatus(id, "IN_PROGRESS", {
+    startedAt: new Date(),
+    startLat: input.currentLat,
+    startLng: input.currentLng,
+  });
   return toRouteDTO(updated);
 }
 

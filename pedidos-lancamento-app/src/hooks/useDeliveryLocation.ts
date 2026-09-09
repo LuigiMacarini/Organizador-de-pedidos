@@ -92,3 +92,33 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
 
   return { permission, position, error };
 }
+
+export type CurrentPositionResult =
+  | { ok: true; latitude: number; longitude: number; accuracy: number | null }
+  | { ok: false; reason: "services-disabled" | "denied" | "unavailable" };
+
+/**
+ * Leitura pontual de GPS (não contínua, diferente de `useDeliveryLocation`)
+ * — usada só na ação de iniciar uma rota, para capturar de onde o
+ * entregador está saindo de verdade nesse momento. Pede permissão no
+ * máximo uma vez por chamada (nunca em loop).
+ */
+export async function getCurrentDeliveryPosition(): Promise<CurrentPositionResult> {
+  const servicesEnabled = await Location.hasServicesEnabledAsync();
+  if (!servicesEnabled) return { ok: false, reason: "services-disabled" };
+
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== "granted") return { ok: false, reason: "denied" };
+
+  try {
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    return {
+      ok: true,
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      accuracy: loc.coords.accuracy,
+    };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}

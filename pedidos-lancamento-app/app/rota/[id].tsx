@@ -7,7 +7,7 @@ import { ApiError } from "../../src/api/httpClient";
 import { OrderDetailsModal } from "../../src/components/OrderDetailsModal";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteMap, type MapStop } from "../../src/components/RouteMap";
-import { useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
+import { getCurrentDeliveryPosition, useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
@@ -94,7 +94,21 @@ export default function RotaDetalheScreen() {
   const handleStart = async () => {
     setBusy(true);
     try {
-      await startRoute(route.id);
+      // Leitura pontual do GPS (distinta do rastreamento contínuo que só liga
+      // depois que a rota já está IN_PROGRESS) — é ela que vira a origem real
+      // da rota, no lugar do depósito fixo.
+      const position = await getCurrentDeliveryPosition();
+      if (!position.ok) {
+        const message =
+          position.reason === "services-disabled"
+            ? "Ative o GPS do celular para iniciar a rota."
+            : position.reason === "denied"
+            ? "Permissão de localização negada — sem ela não é possível iniciar a rota."
+            : "Não foi possível obter sua localização agora. Tente novamente.";
+        Alert.alert("Localização necessária", message);
+        return;
+      }
+      await startRoute(route.id, position.latitude, position.longitude);
       await load();
     } catch (e) {
       Alert.alert("Rota", e instanceof ApiError ? e.message : "Não foi possível iniciar a rota.");

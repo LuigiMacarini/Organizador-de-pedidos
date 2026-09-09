@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import * as routeService from "../../../application/routes/routeService.js";
-import { createRouteInputSchema, routeListQuerySchema } from "../../../domain/route.js";
+import { createRouteInputSchema, routeListQuerySchema, startRouteInputSchema } from "../../../domain/route.js";
 import { requireAuth } from "../plugins/authGuard.js";
 
 export default async function routeRoutes(app: FastifyInstance) {
@@ -22,7 +22,8 @@ export default async function routeRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Params: { id: string } }>("/v1/routes/:id/start", async (request) => {
-    return routeService.start(request.params.id);
+    const input = startRouteInputSchema.parse(request.body);
+    return routeService.start(request.params.id, input);
   });
 
   app.post<{ Params: { id: string } }>("/v1/routes/:id/cancel", async (request) => {

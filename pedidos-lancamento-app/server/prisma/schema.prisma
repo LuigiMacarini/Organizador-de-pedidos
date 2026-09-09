@@ -155,6 +155,12 @@ model Route {
   originLat   Float
   originLng   Float
 
+  /// Posição real (GPS) de onde o entregador estava ao apertar "Iniciar rota"
+  /// — distinta de originLat/Lng (o depósito, ponto de retorno). Só existe
+  /// depois que a rota é iniciada; nulo em DRAFT.
+  startLat Float?
+  startLng Float?
+
   totalDistanceMeters  Int?
   totalDurationSeconds Int?
   /// Polyline codificada (formato padrão Google/OSRM) do trajeto real devolvido

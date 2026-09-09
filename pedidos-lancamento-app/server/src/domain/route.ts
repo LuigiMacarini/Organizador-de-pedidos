@@ -16,6 +16,19 @@ export const createRouteInputSchema = z.object({
 
 export type CreateRouteInput = z.infer<typeof createRouteInputSchema>;
 
+/**
+ * A origem da rota em si (para onde a distância/tempo são calculados) passa
+ * a ser a posição do GPS no momento de iniciar — não mais a origem fixa
+ * usada só como preview na criação. Por isso exigido (não opcional): não dá
+ * pra iniciar uma rota sem saber de onde o entregador está saindo.
+ */
+export const startRouteInputSchema = z.object({
+  currentLat: z.number().finite(),
+  currentLng: z.number().finite(),
+});
+
+export type StartRouteInput = z.infer<typeof startRouteInputSchema>;
+
 export const updateDeliveryStatusInputSchema = z.object({
   status: z.enum(["DELIVERED", "FAILED"]),
   notes: z.string().trim().optional(),
@@ -59,6 +72,9 @@ export type RouteDTO = {
   originLabel: string;
   originLat: number;
   originLng: number;
+  /** Posição real (GPS) de onde o entregador saiu — null até a rota ser iniciada. */
+  startLat: number | null;
+  startLng: number | null;
   totalDistanceMeters: number | null;
   totalDurationSeconds: number | null;
   /** Polyline codificada do trajeto real (padrão Google/OSRM) — `null` se a otimização falhou (modo degradado, ver §13). */
@@ -97,6 +113,8 @@ export function toRouteDTO(
     originLabel: route.originLabel,
     originLat: route.originLat,
     originLng: route.originLng,
+    startLat: route.startLat,
+    startLng: route.startLng,
     totalDistanceMeters: route.totalDistanceMeters,
     totalDurationSeconds: route.totalDurationSeconds,
     geometry: route.geometry,

@@ -79,7 +79,7 @@ export function create(data: CreateRouteData) {
 export function setStatus(
   id: string,
   status: RouteStatus,
-  extra?: { startedAt?: Date; completedAt?: Date }
+  extra?: { startedAt?: Date; completedAt?: Date; startLat?: number; startLng?: number }
 ) {
   return prisma.route.update({
     where: { id },
