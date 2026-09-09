@@ -131,8 +131,11 @@ export function RouteMap({
             title="Você está aqui"
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
+            zIndex={999}
           >
-            <View style={styles.deliveryDot} />
+            <View style={styles.vehicleMarker}>
+              <Text style={styles.vehicleMarkerText}>{"\u{1F697}"}</Text>
+            </View>
           </Marker>
         ) : null}
 
@@ -169,12 +172,23 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   stopMarkerText: { color: "#fff", fontWeight: "800" },
-  deliveryDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  // Distinto de propósito dos marcadores de origem (🏠, quadrado escuro) e
+  // paradas (círculo numerado) — o entregador precisa achar "onde estou" de
+  // relance, sem confundir com "onde são as entregas".
+  vehicleMarker: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 3,
     borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
+  vehicleMarkerText: { fontSize: 17 },
 });
