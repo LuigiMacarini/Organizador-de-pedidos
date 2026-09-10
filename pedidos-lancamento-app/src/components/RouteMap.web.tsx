@@ -18,12 +18,11 @@ const STATUS_LABEL: Record<MapStop["status"], string> = {
  * Maps JavaScript API, outra chave, outro produto) só para a versão web.
  * Aqui mostramos a mesma informação em lista, sem quebrar a build web.
  */
-export function RouteMap({ origin, stops, nextStopId, focusedStopId, height = 320 }: RouteMapProps) {
+export function RouteMap({ stops, nextStopId, focusedStopId, height = 320 }: RouteMapProps) {
   return (
     <View style={[styles.wrap, { height }]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.hint}>Mapa disponível no app mobile. Aqui vai a lista da rota:</Text>
-        <Text style={styles.originText}>{"\u{1F3E0}"} {origin.label}</Text>
         {stops.map((s) => (
           <View
             key={s.id}
@@ -49,7 +48,6 @@ const styles = StyleSheet.create({
   },
   content: { padding: space.md, gap: space.sm },
   hint: { fontSize: 12, color: colors.muted, marginBottom: space.xs },
-  originText: { fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: space.xs },
   stopRow: {
     flexDirection: "row",
     alignItems: "center",

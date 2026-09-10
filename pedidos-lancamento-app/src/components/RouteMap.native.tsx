@@ -27,14 +27,14 @@ function stopColor(stop: MapStop, isNext: boolean): string {
  * substitui a WebView com Leaflet/OpenStreetMap usada antes. Exige dev build
  * (não funciona no Expo Go) e a chave do Maps SDK configurada em
  * app.config.js. Desenha a geometria real da rota (decodificada da polyline
- * da Google Routes API), marcadores de origem/paradas com a próxima entrega
- * destacada, e a posição do entregador. Nunca sai do app.
+ * da Google Routes API), marcadores das paradas com a próxima entrega
+ * destacada, e a posição do entregador — sem origem fixa, a única origem é o
+ * GPS do entregador ao iniciar a rota. Nunca sai do app.
  *
  * Versão só para Android/iOS (Metro resolve `.native.tsx` automaticamente
  * nessas plataformas) — react-native-maps não roda na web, ver RouteMap.web.tsx.
  */
 export function RouteMap({
-  origin,
   stops,
   geometry,
   nextStopId,
@@ -49,20 +49,18 @@ export function RouteMap({
   // geometria) — nunca por causa do GPS, que só move um marcador.
   const path = useMemo(() => {
     const decoded = geometry ? decodePolyline(geometry) : null;
-    const points: [number, number][] =
-      decoded ?? [[origin.lat, origin.lng], ...stops.map((s): [number, number] => [s.lat, s.lng])];
+    const points: [number, number][] = decoded ?? stops.map((s): [number, number] => [s.lat, s.lng]);
     return points.map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origin.lat, origin.lng, geometry, JSON.stringify(stops.map((s) => [s.lat, s.lng]))]);
+  }, [geometry, JSON.stringify(stops.map((s) => [s.lat, s.lng]))]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const coords = path.length > 1 ? path : [{ latitude: origin.lat, longitude: origin.lng }];
-    mapRef.current.fitToCoordinates(coords, {
+    if (!mapReady || !mapRef.current || path.length === 0) return;
+    mapRef.current.fitToCoordinates(path, {
       edgePadding: { top: 48, right: 48, bottom: 48, left: 48 },
       animated: false,
     });
-  }, [mapReady, path, origin.lat, origin.lng]);
+  }, [mapReady, path]);
 
   // Centraliza numa entrega específica quando o entregador toca no card dela
   // — só move a câmera (mesmo mapa, mesmos marcadores). Depende só do id
@@ -168,25 +166,14 @@ export function RouteMap({
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={{
-          latitude: origin.lat,
-          longitude: origin.lng,
+          latitude: stops[0]?.lat ?? currentPosition?.lat ?? 0,
+          longitude: stops[0]?.lng ?? currentPosition?.lng ?? 0,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => setFollowing(false)}
       >
-        <Marker
-          coordinate={{ latitude: origin.lat, longitude: origin.lng }}
-          title={origin.label}
-          anchor={{ x: 0.5, y: 0.5 }}
-          tracksViewChanges={false}
-        >
-          <View style={styles.originMarker}>
-            <Text style={styles.originMarkerText}>{"\u{1F3E0}"}</Text>
-          </View>
-        </Marker>
-
         {stops.map((s) => {
           const isNext = s.id === nextStopId;
           const label = s.status === "DELIVERED" ? "✓" : s.status === "FAILED" ? "!" : String(s.sequence);
@@ -270,17 +257,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   map: { flex: 1 },
-  originMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: colors.text,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
-    borderColor: "#fff",
-  },
-  originMarkerText: { fontSize: 14 },
   stopMarker: {
     alignItems: "center",
     justifyContent: "center",
@@ -288,9 +264,9 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   stopMarkerText: { color: "#fff", fontWeight: "800" },
-  // Distinto de propósito dos marcadores de origem (🏠, quadrado escuro) e
-  // paradas (círculo numerado) — o entregador precisa achar "onde estou" de
-  // relance, sem confundir com "onde são as entregas".
+  // Distinto de propósito dos marcadores de parada (círculo numerado) — o
+  // entregador precisa achar "onde estou" de relance, sem confundir com
+  // "onde são as entregas".
   vehicleMarker: {
     width: 34,
     height: 34,

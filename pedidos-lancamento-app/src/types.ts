@@ -63,9 +63,6 @@ export type DeliveryRoute = {
   id: string;
   delivererId: string;
   status: RouteStatus;
-  originLabel: string;
-  originLat: number;
-  originLng: number;
   startLat: number | null;
   startLng: number | null;
   totalDistanceMeters: number | null;

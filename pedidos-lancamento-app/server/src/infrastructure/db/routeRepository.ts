@@ -37,31 +37,20 @@ export type NewDeliveryInput = {
 
 export type CreateRouteData = {
   delivererId: string;
-  originLabel: string;
-  originLat: number;
-  originLng: number;
-  totalDistanceMeters: number;
-  totalDurationSeconds: number;
-  geometry: string | null;
   deliveries: NewDeliveryInput[];
 };
 
 /**
- * Cria a rota + entregas e marca os pedidos correspondentes como `RELEASED`
- * numa única transação — evita que dois entregadores roteirizem o mesmo
- * pedido numa condição de corrida (ver plano, §17).
+ * Cria a rota + entregas (em rascunho, sem métricas — só calculadas ao
+ * iniciar, a partir do GPS real) e marca os pedidos correspondentes como
+ * `RELEASED` numa única transação — evita que dois entregadores roteirizem o
+ * mesmo pedido numa condição de corrida (ver plano, §17).
  */
 export function create(data: CreateRouteData) {
   return prisma.$transaction(async (tx) => {
     const route = await tx.route.create({
       data: {
         delivererId: data.delivererId,
-        originLabel: data.originLabel,
-        originLat: data.originLat,
-        originLng: data.originLng,
-        totalDistanceMeters: data.totalDistanceMeters,
-        totalDurationSeconds: data.totalDurationSeconds,
-        geometry: data.geometry,
         deliveries: { create: data.deliveries },
       },
       include,
@@ -79,12 +68,46 @@ export function create(data: CreateRouteData) {
 export function setStatus(
   id: string,
   status: RouteStatus,
-  extra?: { startedAt?: Date; completedAt?: Date; startLat?: number; startLng?: number }
+  extra?: { startedAt?: Date; completedAt?: Date }
 ) {
   return prisma.route.update({
     where: { id },
     data: { status, ...extra },
     include,
+  });
+}
+
+/**
+ * Inicia a rota: fixa a sequência otimizada das entregas (calculada a partir
+ * do GPS real, ver `routeService.start`), grava métricas/geometria e marca
+ * `IN_PROGRESS` — tudo numa transação para nunca deixar sequência e métricas
+ * dessincronizadas se algo falhar no meio.
+ */
+export function start(
+  id: string,
+  data: {
+    startLat: number;
+    startLng: number;
+    deliveryOrder: string[];
+    metrics: { totalDistanceMeters: number; totalDurationSeconds: number; geometry: string | null } | null;
+  }
+) {
+  return prisma.$transaction(async (tx) => {
+    for (const [index, deliveryId] of data.deliveryOrder.entries()) {
+      await tx.delivery.update({ where: { id: deliveryId }, data: { sequence: index + 1 } });
+    }
+
+    return tx.route.update({
+      where: { id },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        startLat: data.startLat,
+        startLng: data.startLng,
+        ...(data.metrics ?? {}),
+      },
+      include,
+    });
   });
 }
 

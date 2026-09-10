@@ -31,9 +31,3 @@ services:
         value: Dono
       - key: GOOGLE_MAPS_API_KEY
         sync: false
-      - key: COMPANY_ORIGIN_LAT
-        sync: false
-      - key: COMPANY_ORIGIN_LNG
-        sync: false
-      - key: COMPANY_ORIGIN_LABEL
-        sync: false

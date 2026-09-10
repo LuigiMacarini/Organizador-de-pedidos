@@ -3,9 +3,6 @@ import type { Delivery, DeliveryRoute } from "../types";
 
 export type CreateRouteInput = {
   orderIds: string[];
-  originLat?: number;
-  originLng?: number;
-  originLabel?: string;
 };
 
 type Page<T> = { items: T[]; nextCursor: string | null };

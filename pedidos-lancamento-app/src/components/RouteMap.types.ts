@@ -8,7 +8,6 @@ export type MapStop = {
 };
 
 export type RouteMapProps = {
-  origin: { lat: number; lng: number; label: string };
   stops: MapStop[];
   /** Polyline codificada devolvida pela Google Routes API — sem ela, cai para linha reta entre os pontos. */
   geometry?: string | null;

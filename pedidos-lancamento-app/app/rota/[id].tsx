@@ -116,8 +116,8 @@ export default function RotaDetalheScreen() {
     setBusy(true);
     try {
       // Leitura pontual do GPS (distinta do rastreamento contínuo que só liga
-      // depois que a rota já está IN_PROGRESS) — é ela que vira a origem real
-      // da rota, no lugar do depósito fixo.
+      // depois que a rota já está IN_PROGRESS) — vira a origem real da rota,
+      // usada pelo backend para calcular a ordem de visita e a distância/tempo.
       const position = await getCurrentDeliveryPosition();
       if (!position.ok) {
         const message =
@@ -169,8 +169,8 @@ export default function RotaDetalheScreen() {
     setBusyDeliveryId(deliveryId);
     try {
       // Manda a posição atual do GPS (se já tiver) para o backend recalcular
-      // km/tempo restantes a partir de onde o entregador está de verdade,
-      // não do depósito. Sem GPS ainda, o backend cai para o depósito sozinho.
+      // km/tempo restantes a partir de onde o entregador está de verdade.
+      // Sem GPS ainda, o backend cai para a posição de onde a rota começou.
       await updateDeliveryStatus(
         deliveryId,
         status,
@@ -193,14 +193,17 @@ export default function RotaDetalheScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: route.originLabel }} />
+      <Stack.Screen
+        options={{
+          title: `Rota — ${route.deliveries.length} ${route.deliveries.length === 1 ? "parada" : "paradas"}`,
+        }}
+      />
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
         {/* Fora do ScrollView de propósito: o MapView nativo dentro de um
             ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela
             no React Native. Mapa fixo em cima, lista rola independente embaixo. */}
         <View style={styles.mapWrap}>
           <RouteMap
-            origin={{ lat: route.originLat, lng: route.originLng, label: route.originLabel }}
             stops={mapStops}
             geometry={route.geometry}
             nextStopId={nextStopId}
@@ -241,7 +244,6 @@ export default function RotaDetalheScreen() {
                 ) : null}
               </View>
             </View>
-            <Text style={styles.originText}>Origem: {route.originLabel}</Text>
           </View>
 
           {route.deliveries.map((delivery, index) => (
@@ -373,7 +375,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   summaryMeta: { fontSize: 14, color: colors.muted, fontWeight: "600" },
-  originText: { fontSize: 15, color: colors.text, fontWeight: "600" },
   stopCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
