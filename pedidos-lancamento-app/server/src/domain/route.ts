@@ -3,18 +3,28 @@ import type { Route, Delivery, RouteStatus, DeliveryStatus, Customer } from "@pr
 import { paginationQuerySchema } from "./pagination.js";
 
 /**
- * `originLat`/`originLng`/`originLabel` são opcionais: quando ausentes, o
- * service usa a origem fixa da empresa (variáveis de ambiente
- * `COMPANY_ORIGIN_*`). Ver `routeService.resolveOrigin`.
+ * A criação só agrupa os pedidos escolhidos numa rota em rascunho — sem
+ * origem, sem chamar a Routes API. Não há depósito/local fixo da empresa: a
+ * única origem que existe é o GPS do entregador, capturado ao iniciar a rota
+ * (ver `startRouteInputSchema`).
  */
 export const createRouteInputSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1, "Selecione ao menos um pedido"),
-  originLat: z.number().optional(),
-  originLng: z.number().optional(),
-  originLabel: z.string().trim().optional(),
 });
 
 export type CreateRouteInput = z.infer<typeof createRouteInputSchema>;
+
+/**
+ * A origem real da rota (de onde a distância/tempo/ordem são calculados) é a
+ * posição do GPS no momento de iniciar. Por isso exigido (não opcional): não
+ * dá pra iniciar uma rota sem saber de onde o entregador está saindo.
+ */
+export const startRouteInputSchema = z.object({
+  currentLat: z.number().finite(),
+  currentLng: z.number().finite(),
+});
+
+export type StartRouteInput = z.infer<typeof startRouteInputSchema>;
 
 export const updateDeliveryStatusInputSchema = z.object({
   status: z.enum(["DELIVERED", "FAILED"]),
@@ -56,9 +66,9 @@ export type RouteDTO = {
   id: string;
   delivererId: string;
   status: RouteStatus;
-  originLabel: string;
-  originLat: number;
-  originLng: number;
+  /** Posição real (GPS) de onde o entregador saiu — null até a rota ser iniciada. */
+  startLat: number | null;
+  startLng: number | null;
   totalDistanceMeters: number | null;
   totalDurationSeconds: number | null;
   /** Polyline codificada do trajeto real (padrão Google/OSRM) — `null` se a otimização falhou (modo degradado, ver §13). */
@@ -94,9 +104,8 @@ export function toRouteDTO(
     id: route.id,
     delivererId: route.delivererId,
     status: route.status,
-    originLabel: route.originLabel,
-    originLat: route.originLat,
-    originLng: route.originLng,
+    startLat: route.startLat,
+    startLng: route.startLng,
     totalDistanceMeters: route.totalDistanceMeters,
     totalDurationSeconds: route.totalDurationSeconds,
     geometry: route.geometry,

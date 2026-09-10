@@ -25,7 +25,7 @@ type RoutesContextValue = {
   refresh: () => Promise<void>;
   createRoute: (input: CreateRouteInput) => Promise<DeliveryRoute>;
   getRoute: (id: string) => Promise<DeliveryRoute>;
-  startRoute: (id: string) => Promise<DeliveryRoute>;
+  startRoute: (id: string, currentLat: number, currentLng: number) => Promise<DeliveryRoute>;
   cancelRoute: (id: string) => Promise<DeliveryRoute>;
   updateDeliveryStatus: (
     deliveryId: string,
@@ -76,8 +76,8 @@ export function RoutesProvider({ children }: { children: React.ReactNode }) {
     return route;
   }, []);
 
-  const startRoute = useCallback(async (id: string) => {
-    const updated = await remoteStartRoute(id);
+  const startRoute = useCallback(async (id: string, currentLat: number, currentLng: number) => {
+    const updated = await remoteStartRoute(id, currentLat, currentLng);
     setRoutes((prev) => prev.map((r) => (r.id === id ? updated : r)));
     return updated;
   }, []);

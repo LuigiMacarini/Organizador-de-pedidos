@@ -3,9 +3,6 @@ import type { Delivery, DeliveryRoute } from "../types";
 
 export type CreateRouteInput = {
   orderIds: string[];
-  originLat?: number;
-  originLng?: number;
-  originLabel?: string;
 };
 
 type Page<T> = { items: T[]; nextCursor: string | null };
@@ -23,8 +20,11 @@ export function remoteCreateRoute(input: CreateRouteInput): Promise<DeliveryRout
   return apiRequest<DeliveryRoute>("/v1/routes", { method: "POST", body: input });
 }
 
-export function remoteStartRoute(id: string): Promise<DeliveryRoute> {
-  return apiRequest<DeliveryRoute>(`/v1/routes/${id}/start`, { method: "POST" });
+export function remoteStartRoute(id: string, currentLat: number, currentLng: number): Promise<DeliveryRoute> {
+  return apiRequest<DeliveryRoute>(`/v1/routes/${id}/start`, {
+    method: "POST",
+    body: { currentLat, currentLng },
+  });
 }
 
 export function remoteCancelRoute(id: string): Promise<DeliveryRoute> {

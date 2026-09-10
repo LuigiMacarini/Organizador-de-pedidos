@@ -43,8 +43,8 @@ function RouteCard({ route, onPress }: { route: DeliveryRoute; onPress: () => vo
           {route.deliveries.length} {route.deliveries.length === 1 ? "parada" : "paradas"}
         </Text>
       </View>
-      <Text style={styles.origin} numberOfLines={1}>
-        {route.originLabel}
+      <Text style={styles.cardTitle} numberOfLines={1}>
+        {route.deliveries[0]?.customerName ?? "Rota"}
       </Text>
       <View style={styles.cardBottom}>
         <Text style={styles.meta}>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   stopCount: { fontSize: 13, color: colors.muted, fontWeight: "600" },
-  origin: { fontSize: 16, fontWeight: "700", color: colors.text },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   cardBottom: { flexDirection: "row", justifyContent: "space-between", marginTop: space.xs },
   meta: { color: colors.muted, fontSize: 12 },
 });

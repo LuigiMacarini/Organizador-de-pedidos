@@ -151,9 +151,11 @@ model Route {
   deliverer   User        @relation(fields: [delivererId], references: [id])
   status      RouteStatus @default(DRAFT)
 
-  originLabel String
-  originLat   Float
-  originLng   Float
+  /// Posição real (GPS) de onde o entregador estava ao apertar "Iniciar rota"
+  /// — a única origem que existe (não há depósito/local fixo da empresa). Só
+  /// existe depois que a rota é iniciada; nulo em DRAFT.
+  startLat Float?
+  startLng Float?
 
   totalDistanceMeters  Int?
   totalDurationSeconds Int?

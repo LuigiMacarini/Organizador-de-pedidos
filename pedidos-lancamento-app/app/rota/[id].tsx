@@ -7,7 +7,8 @@ import { ApiError } from "../../src/api/httpClient";
 import { OrderDetailsModal } from "../../src/components/OrderDetailsModal";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { RouteMap, type MapStop } from "../../src/components/RouteMap";
-import { useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
+import { getCurrentDeliveryPosition, useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
+import { useNavigationAnnouncements } from "../../src/hooks/useNavigationAnnouncements";
 import { useRoutes } from "../../src/routesContext";
 import { colors, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
@@ -40,6 +41,7 @@ export default function RotaDetalheScreen() {
   const [busyDeliveryId, setBusyDeliveryId] = useState<string | null>(null);
   const [focusedStopId, setFocusedStopId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [voiceMuted, setVoiceMuted] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -81,6 +83,25 @@ export default function RotaDetalheScreen() {
   // rodando aqui só para alimentar o marcador "você está aqui" no mapa.
   const { position: deliveryPosition } = useDeliveryLocation(canExecute);
 
+  const nextStopForVoice = useMemo(() => {
+    const stop = route?.deliveries.find((d) => d.id === nextStopId);
+    if (!stop) return null;
+    return {
+      id: stop.id,
+      lat: stop.destinationLat,
+      lng: stop.destinationLng,
+      customerName: stop.customerName,
+    };
+  }, [route, nextStopId]);
+
+  // Navegação por voz simplificada (ver limitações no hook) — só ativa
+  // durante uma rota em execução, igual o rastreamento contínuo de GPS.
+  useNavigationAnnouncements(
+    canExecute ? nextStopForVoice : null,
+    deliveryPosition ? { latitude: deliveryPosition.latitude, longitude: deliveryPosition.longitude } : null,
+    voiceMuted
+  );
+
   if (loading || !route) {
     return (
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
@@ -94,7 +115,21 @@ export default function RotaDetalheScreen() {
   const handleStart = async () => {
     setBusy(true);
     try {
-      await startRoute(route.id);
+      // Leitura pontual do GPS (distinta do rastreamento contínuo que só liga
+      // depois que a rota já está IN_PROGRESS) — vira a origem real da rota,
+      // usada pelo backend para calcular a ordem de visita e a distância/tempo.
+      const position = await getCurrentDeliveryPosition();
+      if (!position.ok) {
+        const message =
+          position.reason === "services-disabled"
+            ? "Ative o GPS do celular para iniciar a rota."
+            : position.reason === "denied"
+            ? "Permissão de localização negada — sem ela não é possível iniciar a rota."
+            : "Não foi possível obter sua localização agora. Tente novamente.";
+        Alert.alert("Localização necessária", message);
+        return;
+      }
+      await startRoute(route.id, position.latitude, position.longitude);
       await load();
     } catch (e) {
       Alert.alert("Rota", e instanceof ApiError ? e.message : "Não foi possível iniciar a rota.");
@@ -134,8 +169,8 @@ export default function RotaDetalheScreen() {
     setBusyDeliveryId(deliveryId);
     try {
       // Manda a posição atual do GPS (se já tiver) para o backend recalcular
-      // km/tempo restantes a partir de onde o entregador está de verdade,
-      // não do depósito. Sem GPS ainda, o backend cai para o depósito sozinho.
+      // km/tempo restantes a partir de onde o entregador está de verdade.
+      // Sem GPS ainda, o backend cai para a posição de onde a rota começou.
       await updateDeliveryStatus(
         deliveryId,
         status,
@@ -158,20 +193,27 @@ export default function RotaDetalheScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: route.originLabel }} />
+      <Stack.Screen
+        options={{
+          title: `Rota — ${route.deliveries.length} ${route.deliveries.length === 1 ? "parada" : "paradas"}`,
+        }}
+      />
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
         {/* Fora do ScrollView de propósito: o MapView nativo dentro de um
             ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela
             no React Native. Mapa fixo em cima, lista rola independente embaixo. */}
         <View style={styles.mapWrap}>
           <RouteMap
-            origin={{ lat: route.originLat, lng: route.originLng, label: route.originLabel }}
             stops={mapStops}
             geometry={route.geometry}
             nextStopId={nextStopId}
             currentPosition={
               deliveryPosition
-                ? { lat: deliveryPosition.latitude, lng: deliveryPosition.longitude }
+                ? {
+                    lat: deliveryPosition.latitude,
+                    lng: deliveryPosition.longitude,
+                    heading: deliveryPosition.heading,
+                  }
                 : null
             }
             focusedStopId={focusedStopId}
@@ -183,11 +225,25 @@ export default function RotaDetalheScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
               <Text style={styles.statusBadge}>{STATUS_LABEL[route.status]}</Text>
-              <Text style={styles.summaryMeta}>
-                {formatDistance(route.totalDistanceMeters)} · {formatDuration(route.totalDurationSeconds)}
-              </Text>
+              <View style={styles.summaryTopRight}>
+                <Text style={styles.summaryMeta}>
+                  {formatDistance(route.totalDistanceMeters)} · {formatDuration(route.totalDurationSeconds)}
+                </Text>
+                {canExecute ? (
+                  <Pressable
+                    onPress={() => setVoiceMuted((prev) => !prev)}
+                    hitSlop={8}
+                    accessibilityLabel={voiceMuted ? "Ativar voz da navegação" : "Silenciar voz da navegação"}
+                  >
+                    <Ionicons
+                      name={voiceMuted ? "volume-mute-outline" : "volume-high-outline"}
+                      size={20}
+                      color={colors.muted}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-            <Text style={styles.originText}>Origem: {route.originLabel}</Text>
           </View>
 
           {route.deliveries.map((delivery, index) => (
@@ -310,6 +366,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   summaryTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  summaryTopRight: { flexDirection: "row", alignItems: "center", gap: space.sm },
   statusBadge: {
     fontSize: 12,
     fontWeight: "800",
@@ -318,7 +375,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   summaryMeta: { fontSize: 14, color: colors.muted, fontWeight: "600" },
-  originText: { fontSize: 15, color: colors.text, fontWeight: "600" },
   stopCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

@@ -160,25 +160,32 @@ async function callComputeRoutes(body: Record<string, unknown>): Promise<NonNull
 }
 
 /**
- * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` e
- * retornando a ela (viagem de ida e volta ao depósito). Usa a Routes API
- * (`computeRoutes`) com `optimizeWaypointOrder: true`.
+ * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` (posição
+ * do entregador) — mão única, sem retorno. A Routes API exige um `destination`
+ * fixo (não reordenável); por isso a última parada de `stops` é usada como
+ * destino e as demais entram como `intermediates` com `optimizeWaypointOrder:
+ * true` — a Google ainda decide a melhor ordem de visita entre elas, só o
+ * ponto final é fixo. Não é um limiar arbitrário: é a única forma de expressar
+ * "várias paradas, sem voltar ao início" nessa API.
  */
 export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
   if (stops.length === 0) {
     throw new Error("optimizeRoute chamado sem nenhuma parada");
   }
 
+  const last = stops[stops.length - 1];
+  const intermediates = stops.slice(0, -1);
+
   const route = await callComputeRoutes({
     origin: toWaypoint(origin),
-    destination: toWaypoint(origin),
-    intermediates: stops.map(toWaypoint),
+    destination: toWaypoint(last),
+    ...(intermediates.length > 0 ? { intermediates: intermediates.map(toWaypoint) } : {}),
     travelMode: "DRIVE",
-    optimizeWaypointOrder: true,
+    optimizeWaypointOrder: intermediates.length > 0,
   });
 
-  const orderIndexes = route.optimizedIntermediateWaypointIndex ?? stops.map((_, i) => i);
-  const order = orderIndexes.map((i) => stops[i].refId);
+  const orderIndexes = route.optimizedIntermediateWaypointIndex ?? intermediates.map((_, i) => i);
+  const order = [...orderIndexes.map((i) => intermediates[i].refId), last.refId];
   const durationSeconds = route.duration ? Math.round(parseFloat(route.duration.replace("s", ""))) : 0;
 
   return {
@@ -200,8 +207,8 @@ export type RouteMetrics = {
  * reotimizar a ordem (`optimizeWaypointOrder: false`) — usado para recalcular
  * o restante de uma rota em andamento depois que uma entrega é concluída.
  * Reotimizar a sequência é feature futura; aqui só medimos o trajeto que já
- * está decidido. Fecha em `destination` — mesma definição de "distância/tempo
- * total" usada na criação da rota (round-trip até o depósito).
+ * está decidido. Fecha em `destination`, que o chamador decide — hoje sempre
+ * a última parada restante (rota de mão única, sem depósito de retorno).
  */
 export async function computeRouteMetrics(
   origin: Coordinate,

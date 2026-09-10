@@ -41,9 +41,10 @@ export async function updateStatus(id: string, input: UpdateDeliveryStatusInput)
 /**
  * Sequência das paradas restantes já está decidida (vem ordenada por
  * `sequence`) — não reotimiza, só mede o trajeto: origem = posição atual do
- * entregador quando informada pelo app, senão o depósito da rota; destino =
- * sempre o depósito (mesma definição de "total" usada na criação). Falha no
- * Google Routes não pode travar a confirmação da entrega — fica com os
+ * entregador quando informada pelo app, senão a posição de onde a rota
+ * começou (`route.startLat/Lng`, gravada ao iniciar); destino = sempre a
+ * última parada restante (rota de mão única, sem depósito de retorno). Falha
+ * no Google Routes não pode travar a confirmação da entrega — fica com os
  * últimos valores conhecidos (mesmo modo degradado da criação da rota).
  */
 async function recalculateRemaining(
@@ -57,13 +58,19 @@ async function recalculateRemaining(
   const origin =
     input.currentLat !== undefined && input.currentLng !== undefined
       ? { latitude: input.currentLat, longitude: input.currentLng }
-      : { latitude: route.originLat, longitude: route.originLng };
-  const destination = { latitude: route.originLat, longitude: route.originLng };
+      : route.startLat !== null && route.startLng !== null
+      ? { latitude: route.startLat, longitude: route.startLng }
+      : null;
+  if (!origin) return;
+
+  const last = remaining[remaining.length - 1];
+  const intermediates = remaining.slice(0, -1);
+  const destination = { latitude: last.destinationLat, longitude: last.destinationLng };
 
   try {
     const metrics = await computeRouteMetrics(
       origin,
-      remaining.map((d) => ({ latitude: d.destinationLat, longitude: d.destinationLng })),
+      intermediates.map((d) => ({ latitude: d.destinationLat, longitude: d.destinationLng })),
       destination
     );
     await routeRepository.updateMetrics(routeId, metrics);
