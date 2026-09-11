@@ -17,6 +17,30 @@ function apiKey(): string {
   return key;
 }
 
+/**
+ * 10s: a própria Google documenta respostas na casa de segundos para essas
+ * APIs — sem limite, uma chamada travada aqui prende a requisição HTTP
+ * inteira que a chamou (o Fastify não tem `connectionTimeout` configurado),
+ * incluindo confirmações de entrega que não dependem de mais nada.
+ */
+const GOOGLE_TIMEOUT_MS = 10_000;
+
+/** Mesmo motivo do timeout em `httpClient.ts` do app: sem isso, `fetch` pode travar sem nunca resolver nem rejeitar. */
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GOOGLE_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Chamada ao Google Maps Platform excedeu ${GOOGLE_TIMEOUT_MS}ms sem resposta`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export type GeocodeAddressInput = {
   street?: string | null;
   number?: string | null;
@@ -77,7 +101,7 @@ export async function geocodeAddress(input: GeocodeAddressInput): Promise<Geocod
     .join(", ");
 
   const params = new URLSearchParams({ address, key: apiKey(), region: "br" });
-  const res = await fetch(`${GEOCODING_URL}?${params.toString()}`);
+  const res = await fetchWithTimeout(`${GEOCODING_URL}?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Google Geocoding falhou (HTTP ${res.status})`);
   }
@@ -136,7 +160,7 @@ async function callComputeRoutes(body: Record<string, unknown>): Promise<NonNull
     `[Google Routes] computeRoutes chamado — optimizeWaypointOrder=${body.optimizeWaypointOrder}, paradas=${intermediates}`
   );
 
-  const res = await fetch(ROUTES_URL, {
+  const res = await fetchWithTimeout(ROUTES_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -250,7 +274,7 @@ export async function autocompleteAddress(input: string): Promise<PlaceSuggestio
     components: "country:br",
     language: "pt-BR",
   });
-  const res = await fetch(`${PLACES_AUTOCOMPLETE_URL}?${params.toString()}`);
+  const res = await fetchWithTimeout(`${PLACES_AUTOCOMPLETE_URL}?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Google Places autocomplete falhou (HTTP ${res.status})`);
   }
@@ -290,7 +314,7 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
     language: "pt-BR",
     fields: "formatted_address,geometry,address_component",
   });
-  const res = await fetch(`${PLACE_DETAILS_URL}?${params.toString()}`);
+  const res = await fetchWithTimeout(`${PLACE_DETAILS_URL}?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Google Place Details falhou (HTTP ${res.status})`);
   }

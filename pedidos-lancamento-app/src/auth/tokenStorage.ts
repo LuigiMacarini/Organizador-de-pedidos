@@ -1,8 +1,10 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import type { AuthUser } from "../types";
 
 const ACCESS_KEY = "pedidos.accessToken";
 const REFRESH_KEY = "pedidos.refreshToken";
+const USER_KEY = "pedidos.user";
 
 /**
  * No nativo usamos o keychain/keystore criptografado (`expo-secure-store`).
@@ -55,6 +57,26 @@ export async function saveAccessToken(accessToken: string): Promise<void> {
   await setItem(ACCESS_KEY, accessToken);
 }
 
+/**
+ * Cópia local do usuário logado — só para renderizar a UI imediatamente na
+ * abertura do app sem esperar rede (ver `AuthProvider`). Não é fonte de
+ * verdade: `remoteMe()` sempre roda em seguida, em segundo plano, pra
+ * confirmar/atualizar esses dados contra o servidor.
+ */
+export async function saveUser(user: AuthUser): Promise<void> {
+  await setItem(USER_KEY, JSON.stringify(user));
+}
+
+export async function loadUser(): Promise<AuthUser | null> {
+  const raw = await getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
 export async function clearTokens(): Promise<void> {
-  await Promise.all([deleteItem(ACCESS_KEY), deleteItem(REFRESH_KEY)]);
+  await Promise.all([deleteItem(ACCESS_KEY), deleteItem(REFRESH_KEY), deleteItem(USER_KEY)]);
 }

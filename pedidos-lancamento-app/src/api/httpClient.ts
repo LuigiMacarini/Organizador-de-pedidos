@@ -19,6 +19,27 @@ export class NetworkError extends ApiError {
   }
 }
 
+/**
+ * Distinto de `NetworkError`: aqui a conexão nem chegou a falhar — ela ficou
+ * pendurada sem resposta além do limite de tempo. Achado da auditoria (4G em
+ * movimento real): sem isso, `fetch()` pode nunca resolver nem rejeitar, e
+ * qualquer `await` que dependa dele (e o `finally` que desliga o loading)
+ * trava para sempre — exatamente o sintoma relatado em ENTREGUE/NÃO ENTREGUE.
+ */
+export class TimeoutError extends ApiError {
+  constructor() {
+    super("A operação demorou demais para responder. Verifique sua conexão e tente novamente.", -2);
+  }
+}
+
+/**
+ * 15s: tempo suficiente para uma requisição real terminar mesmo em rede
+ * degradada (inclui casos em que o servidor ainda está processando algo mais
+ * lento, como recalcular a rota via Google Routes) sem deixar o usuário
+ * esperando indefinidamente por uma conexão que já travou.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /** Chamado pelo AuthProvider para reagir (redirecionar ao login) quando a sessão expira de vez. */
 let onSessionExpired: (() => void) | null = null;
 export function setSessionExpiredHandler(handler: () => void) {
@@ -58,11 +79,17 @@ async function readErrorMessage(res: Response): Promise<string> {
 async function refreshAccessToken(): Promise<string | null> {
   const tokens = await loadTokens();
   if (!tokens) return null;
+  // Mesmo risco de `fetch` travar sem resposta que motivou o timeout em
+  // `doFetch` — esta chamada roda dentro da mesma cadeia (qualquer requisição
+  // autenticada que leve um 401 passa por aqui), então precisa do mesmo limite.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(joinUrl(requireBaseUrl(), "/v1/auth/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { accessToken: string };
@@ -70,6 +97,8 @@ async function refreshAccessToken(): Promise<string | null> {
     return data.accessToken;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -88,20 +117,37 @@ async function doFetch(base: string, path: string, options: RequestOptions, toke
   // FST_ERR_CTP_EMPTY_JSON_BODY, já que promete um JSON que nunca chega.
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  // `AbortController` é o único jeito de dar um limite de tempo ao `fetch` —
+  // sem ele, uma conexão que trava (comum em troca de torre no 4G) nunca
+  // resolve nem rejeita, e nada que depender desse `await` termina.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const startedAt = Date.now();
+
   try {
     const res = await fetch(joinUrl(base, path), {
       method,
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
     });
-    console.log(`[API] ${method} ${path} -> ${res.status}`);
+    console.log(`[API] ${method} ${path} -> ${res.status} (${Date.now() - startedAt}ms)`);
     return res;
   } catch (err) {
+    const elapsedMs = Date.now() - startedAt;
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error(`[API] ${method} ${path} -> timeout após ${elapsedMs}ms (limite: ${REQUEST_TIMEOUT_MS}ms)`);
+      throw new TimeoutError();
+    }
     // `fetch` rejeita (sem resposta HTTP nenhuma) quando o servidor está fora do ar,
     // o endereço está errado ou não há rede — diferente de um erro que o servidor
-    // respondeu de propósito (ex.: 401 de senha errada).
-    console.error(`[API] ${method} ${path} -> falha de rede (servidor inalcançável)`, err);
+    // respondeu de propósito (ex.: 401 de senha errada). O Fetch API não expõe o
+    // motivo exato (DNS, recusa de conexão, TLS) — só que não houve resposta.
+    console.error(`[API] ${method} ${path} -> falha de rede (servidor inalcançável) após ${elapsedMs}ms`, err);
     throw new NetworkError();
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
