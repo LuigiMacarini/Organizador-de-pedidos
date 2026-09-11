@@ -11,6 +11,12 @@ import { ProductsProvider } from "../src/productsContext";
 import { RoutesProvider } from "../src/routesContext";
 import { colors } from "../src/theme";
 import type { AuthUser } from "../src/types";
+import { markStartup } from "../src/utils/startupTiming";
+
+// T1 do experimento de inicialização (ver relatório): primeiro código do app
+// a rodar depois que o bundle JS foi avaliado — o mais próximo de "JS
+// disponível" que dá pra observar sem instrumentação nativa.
+markStartup("js_module_evaluated");
 
 /**
  * 100% de amostragem (tracing + profiling) — deliberado, é a janela de
@@ -60,6 +66,13 @@ function AppShell() {
   const { user, loading } = useAuth();
   useProtectedRoute(user, loading);
 
+  // T3 do experimento: quando `loading` (autenticação) vira `false` — com a
+  // renderização otimista de `AuthProvider`, isso deve acontecer quase na
+  // hora quando já existe usuário em cache local, mesmo sem rede ainda.
+  useEffect(() => {
+    if (!loading) markStartup("auth_resolved_ui_unblocked");
+  }, [loading]);
+
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
@@ -93,6 +106,12 @@ function AppShell() {
 }
 
 function RootLayout() {
+  // T2 do experimento: primeiro render da árvore React (efeitos rodam após o
+  // commit inicial) — mede o tempo entre "JS avaliado" e "React de pé".
+  useEffect(() => {
+    markStartup("react_root_rendered");
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

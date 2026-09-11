@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { remoteGetOrder } from "../api/ordersRemote";
 import { getOrderTotal } from "../domain/order";
+import { useRoutes } from "../routesContext";
 import { colors, radii, space } from "../theme";
 import type { Order } from "../types";
 import { formatBRL } from "../utils/format";
@@ -17,11 +18,15 @@ type Props = {
 
 /**
  * Consulta simples do pedido de uma entrega — só leitura, nenhuma ação aqui
- * altera rota/entrega/pedido. Reusa GET /v1/orders/:id (já existente).
- * Guarda os pedidos já buscados num cache em memória (só dura enquanto a
- * modal está montada) para não repetir o GET ao reabrir a mesma entrega.
+ * altera rota/entrega/pedido. Primeiro tenta o cache compartilhado de
+ * `RoutesProvider` (pré-carregado ao iniciar a rota, funciona sem internet);
+ * só cai para `GET /v1/orders/:id` em cache miss — pedido de uma rota que
+ * ainda não foi iniciada, ou falha pontual no pré-carregamento. Mantém
+ * também um cache local (dura enquanto a modal está montada) para não
+ * repetir esse GET de fallback ao reabrir a mesma entrega na sessão.
  */
 export function OrderDetailsModal({ orderId, address, onClose }: Props) {
+  const { getCachedOrder } = useRoutes();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +34,14 @@ export function OrderDetailsModal({ orderId, address, onClose }: Props) {
 
   useEffect(() => {
     if (!orderId) return;
+
+    const preloaded = getCachedOrder(orderId);
+    if (preloaded) {
+      setOrder(preloaded);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     const cached = cacheRef.current.get(orderId);
     if (cached) {
@@ -59,7 +72,7 @@ export function OrderDetailsModal({ orderId, address, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, getCachedOrder]);
 
   return (
     <Modal visible={orderId !== null} animationType="slide" transparent onRequestClose={onClose}>
