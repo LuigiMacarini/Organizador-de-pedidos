@@ -14,7 +14,20 @@ import { SearchBar } from "../../src/components/SearchBar";
 import { useAuth } from "../../src/auth/authContext";
 import { useCustomers } from "../../src/customersContext";
 import { useOrders } from "../../src/ordersContext";
-import { colors, radii, space } from "../../src/theme";
+import { colors, fonts, radii, space } from "../../src/theme";
+import type { Customer } from "../../src/types";
+
+type FilterKey = "all" | "withOrders" | "noAddress";
+
+function hasNoAddress(c: Customer): boolean {
+  return c.geocodeStatus !== "OK";
+}
+
+function geoBadge(c: Customer): { label: string; warn: boolean } {
+  if (c.geocodeStatus === "OK") return { label: "Geo OK", warn: false };
+  if (c.geocodeStatus === "PARTIAL") return { label: "Rever CEP", warn: true };
+  return { label: "Sem endereço", warn: true };
+}
 
 export default function ClientesScreen() {
   const router = useRouter();
@@ -22,6 +35,7 @@ export default function ClientesScreen() {
   const { customers, loading } = useCustomers();
   const { orders } = useOrders();
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   const orderCountByCustomer = useMemo(() => {
     const map = new Map<string, number>();
@@ -31,18 +45,30 @@ export default function ClientesScreen() {
     return map;
   }, [orders]);
 
+  const noAddressCount = useMemo(() => customers.filter(hasNoAddress).length, [customers]);
+  const withOrdersCount = useMemo(
+    () => customers.filter((c) => (orderCountByCustomer.get(c.id) ?? 0) > 0).length,
+    [customers, orderCountByCustomer]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter((c) => c.name.toLowerCase().includes(q));
-  }, [customers, query]);
+    let list = customers;
+    if (filter === "withOrders") list = list.filter((c) => (orderCountByCustomer.get(c.id) ?? 0) > 0);
+    else if (filter === "noAddress") list = list.filter(hasNoAddress);
+    if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
+    return list;
+  }, [customers, query, filter, orderCountByCustomer]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Clientes</Text>
-          <Text style={styles.subtitle}>{customers.length} cadastrados</Text>
+          <Text style={styles.subtitle}>
+            {customers.length} cadastrados
+            {noAddressCount > 0 ? ` · ${noAddressCount} sem endereço` : ""}
+          </Text>
         </View>
         <Pressable
           onPress={() => void logout()}
@@ -70,6 +96,36 @@ export default function ClientesScreen() {
         <SearchBar value={query} onChangeText={setQuery} placeholder="Buscar cliente" />
       </View>
 
+      {!loading && customers.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filtersWrap}
+          contentContainerStyle={styles.filtersRow}
+        >
+          {(
+            [
+              { key: "all", label: "Todos", count: customers.length },
+              { key: "withOrders", label: "Com pedido", count: withOrdersCount },
+              { key: "noAddress", label: "Sem endereço", count: noAddressCount },
+            ] as { key: FilterKey; label: string; count: number }[]
+          ).map((f) => {
+            const active = filter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                style={[styles.filterPill, active && styles.filterPillActive]}
+              >
+                <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                  {f.label} {f.count}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
@@ -89,13 +145,16 @@ export default function ClientesScreen() {
         <View style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>Nenhum resultado</Text>
           <Text style={styles.emptyText}>
-            Nenhum cliente encontrado para “{query.trim()}”.
+            {query.trim()
+              ? `Nenhum cliente encontrado para “${query.trim()}”.`
+              : "Nenhum cliente neste filtro."}
           </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
           {filtered.map((c) => {
             const count = orderCountByCustomer.get(c.id) ?? 0;
+            const badge = geoBadge(c);
             return (
               <Pressable
                 key={c.id}
@@ -103,26 +162,19 @@ export default function ClientesScreen() {
                 style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.995 }] }]}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {c.name}
-                  </Text>
-                  {c.phone?.trim() ? (
-                    <Text style={styles.contact} numberOfLines={1}>
-                      {c.phone.trim()}
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {c.name}
                     </Text>
-                  ) : null}
-                  {c.note?.trim() ? (
-                    <Text style={styles.note} numberOfLines={1}>
-                      {c.note.trim()}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={styles.right}>
-                  <Text style={styles.count}>
-                    {count} {count === 1 ? "pedido" : "pedidos"}
+                    <View style={[styles.badge, badge.warn && styles.badgeWarn]}>
+                      <Text style={[styles.badgeText, badge.warn && styles.badgeTextWarn]}>{badge.label}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {count} {count === 1 ? "pedido" : "pedidos"} · {c.neighborhood?.trim() || "—"}
                   </Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
                 </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
               </Pressable>
             );
           })}
@@ -145,12 +197,18 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  title: { fontSize: 26, fontWeight: "800", color: colors.text },
-  subtitle: { marginTop: 4, color: colors.muted, fontSize: 14 },
+  title: {
+    fontFamily: fonts.displayBlack,
+    fontSize: 28,
+    letterSpacing: 0.2,
+    color: colors.text,
+    textTransform: "uppercase",
+  },
+  subtitle: { marginTop: 2, color: colors.muted, fontSize: 14, fontFamily: fonts.body },
   iconBtn: {
     width: 44,
     height: 44,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -161,11 +219,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     minHeight: 44,
     justifyContent: "center",
   },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  ctaText: { color: "#fff", fontFamily: fonts.bodySemiBold, fontSize: 14 },
   searchWrap: {
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
@@ -173,8 +231,27 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
+  filtersWrap: { maxWidth: 720, width: "100%", alignSelf: "center" },
+  filtersRow: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.xs },
+  filterPill: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  filterPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterPillText: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  filterPillTextActive: { color: "#fff" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm },
-  loadingText: { color: colors.muted },
+  loadingText: { color: colors.muted, fontFamily: fonts.body },
   emptyBox: {
     flex: 1,
     padding: space.xl,
@@ -184,27 +261,27 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
-  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
+  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, fontFamily: fonts.body },
   ctaWide: {
     marginTop: space.sm,
     backgroundColor: colors.primary,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     paddingVertical: space.md,
     alignItems: "center",
   },
-  ctaWideText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  ctaWideText: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 16, textTransform: "uppercase" },
   list: {
     paddingHorizontal: space.lg,
     paddingBottom: space.xl * 2,
-    gap: space.md,
+    gap: space.sm,
     maxWidth: 720,
     width: "100%",
     alignSelf: "center",
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     padding: space.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -212,9 +289,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.md,
   },
-  name: { fontSize: 17, fontWeight: "800", color: colors.text },
-  contact: { marginTop: 2, color: colors.muted, fontSize: 13 },
-  note: { marginTop: 2, color: colors.muted, fontSize: 12 },
-  right: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  count: { color: colors.muted, fontSize: 13, fontWeight: "600" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  name: { fontSize: 16, fontFamily: fonts.display, color: colors.text, flexShrink: 1 },
+  meta: { marginTop: 2, color: colors.muted, fontSize: 13, fontFamily: fonts.body },
+  badge: {
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  badgeWarn: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerSoft },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  badgeTextWarn: { color: colors.danger },
 });

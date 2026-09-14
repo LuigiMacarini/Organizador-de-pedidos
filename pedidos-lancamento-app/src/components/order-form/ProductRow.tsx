@@ -1,7 +1,7 @@
 import React, { memo, useCallback } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { Product } from "../../types";
-import { colors, radii, space } from "../../theme";
+import { colors, fonts, radii, space } from "../../theme";
 import { formatBRL } from "../../utils/format";
 
 const MAX_QTY = 1_000_000;
@@ -105,8 +105,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   info: { flex: 1, minWidth: 0 },
-  name: { fontSize: 14, fontWeight: "600", color: colors.text },
-  meta: { marginTop: 2, fontSize: 12, color: colors.muted },
+  name: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: colors.text },
+  meta: { marginTop: 2, fontSize: 12, color: colors.muted, fontFamily: fonts.body },
   qtyRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
   qtyBtn: {
     width: 32,
@@ -119,13 +119,13 @@ const styles = StyleSheet.create({
   },
   qtyBtnPressed: { backgroundColor: colors.bg },
   qtyBtnDisabled: { opacity: 0.4 },
-  qtyBtnText: { fontSize: 18, fontWeight: "700", color: colors.text },
+  qtyBtnText: { fontSize: 18, fontFamily: fonts.bodyBold, color: colors.text },
   qtyBtnTextDisabled: { color: colors.muted },
   qtyInput: {
     minWidth: 40,
     textAlign: "center",
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,

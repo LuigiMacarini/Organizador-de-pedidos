@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { normalizeName, useCustomers } from "../customersContext";
-import { colors, radii, space } from "../theme";
+import { colors, fonts, radii, space } from "../theme";
 import { SearchBar } from "./SearchBar";
 
 type Props = {
@@ -160,8 +160,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     backgroundColor: "#FAFBFF",
   },
-  fieldText: { flex: 1, fontSize: 16, color: colors.text },
-  placeholder: { color: colors.muted },
+  fieldText: { flex: 1, fontSize: 16, color: colors.text, fontFamily: fonts.bodySemiBold },
+  placeholder: { color: colors.muted, fontFamily: fonts.body },
   backdrop: {
     flex: 1,
     // Fundo sólido (sem transparência) — foco exclusivo na seleção do cliente,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sheetTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
+  sheetTitle: { fontSize: 18, fontFamily: fonts.display, color: colors.text },
   listWrap: { flexGrow: 0 },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   row: {
@@ -193,17 +193,17 @@ const styles = StyleSheet.create({
     gap: space.md,
     paddingVertical: space.md,
   },
-  rowName: { fontSize: 16, fontWeight: "600", color: colors.text },
-  rowMeta: { marginTop: 2, fontSize: 13, color: colors.muted },
-  empty: { color: colors.muted, fontSize: 14, paddingVertical: space.lg, textAlign: "center" },
+  rowName: { fontSize: 16, fontFamily: fonts.bodySemiBold, color: colors.text },
+  rowMeta: { marginTop: 2, fontSize: 13, color: colors.muted, fontFamily: fonts.body },
+  empty: { color: colors.muted, fontSize: 14, paddingVertical: space.lg, textAlign: "center", fontFamily: fonts.body },
   createBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: space.sm,
     backgroundColor: colors.primary,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     paddingVertical: space.md,
   },
-  createText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  createText: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 15, textTransform: "uppercase" },
 });

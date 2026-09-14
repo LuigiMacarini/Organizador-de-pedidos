@@ -1,16 +1,18 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { LineItem } from "../../types";
-import { colors, space } from "../../theme";
+import { colors, fonts, space } from "../../theme";
 import { formatBRL } from "../../utils/format";
 import { getOrderTotal } from "../../domain/order";
 
 type Props = {
   customerName: string;
+  /** Endereço já formatado (rua/número — bairro, cidade/UF) — `null` quando o cliente ainda não tem um. */
+  customerAddress?: string | null;
   items: LineItem[];
 };
 
-export function OrderSummary({ customerName, items }: Props) {
+export function OrderSummary({ customerName, customerAddress, items }: Props) {
   const total = getOrderTotal(items);
   const units = items.reduce((acc, l) => acc + l.qty, 0);
 
@@ -18,11 +20,12 @@ export function OrderSummary({ customerName, items }: Props) {
     <View style={styles.card}>
       <Text style={styles.title}>Resumo do pedido</Text>
 
-      <View style={styles.row}>
+      <View style={styles.customerBlock}>
         <Text style={styles.label}>Cliente</Text>
-        <Text style={styles.value} numberOfLines={1}>
+        <Text style={styles.customerName} numberOfLines={1}>
           {customerName.trim() || "—"}
         </Text>
+        {customerAddress ? <Text style={styles.customerAddress}>{customerAddress}</Text> : null}
       </View>
 
       <Text style={styles.section}>Produtos pedidos</Text>
@@ -71,20 +74,31 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.text,
     textTransform: "uppercase",
     letterSpacing: 0.4,
     marginBottom: space.sm,
   },
+  customerBlock: {
+    paddingBottom: space.sm,
+    marginBottom: space.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: 2,
+  },
+  customerName: { fontSize: 16, fontFamily: fonts.display, color: colors.text },
+  customerAddress: { fontSize: 13, color: colors.muted, fontFamily: fonts.body, lineHeight: 18 },
   section: {
     marginTop: space.md,
     marginBottom: space.xs,
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  empty: { color: colors.muted, fontSize: 14, marginBottom: space.sm },
+  empty: { color: colors.muted, fontSize: 14, marginBottom: space.sm, fontFamily: fonts.body },
   productRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -94,23 +108,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  productName: { fontSize: 14, fontWeight: "600", color: colors.text },
-  productMeta: { marginTop: 2, fontSize: 12, color: colors.muted },
-  productSub: { fontSize: 14, fontWeight: "700", color: colors.text },
+  productName: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: colors.text },
+  productMeta: { marginTop: 2, fontSize: 12, color: colors.muted, fontFamily: fonts.body },
+  productSub: { fontSize: 14, fontFamily: fonts.bodyBold, color: colors.text },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: space.md,
     paddingVertical: 6,
   },
-  label: { color: colors.muted, fontSize: 14 },
-  value: { color: colors.text, fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  label: { color: colors.muted, fontSize: 11, fontFamily: fonts.bodySemiBold, textTransform: "uppercase", letterSpacing: 0.5 },
+  value: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemiBold, flexShrink: 1 },
   totalRow: {
     marginTop: space.sm,
     paddingTop: space.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  totalLabel: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  totalValue: { color: colors.text, fontSize: 17, fontWeight: "800" },
+  totalLabel: { color: colors.text, fontSize: 15, fontFamily: fonts.bodyBold },
+  totalValue: { color: colors.text, fontSize: 20, fontFamily: fonts.displayBlack },
 });

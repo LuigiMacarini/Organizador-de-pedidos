@@ -7,7 +7,7 @@ import {
   Text,
   ViewStyle,
 } from "react-native";
-import { colors, radii, space } from "../theme";
+import { colors, fonts, radii, space } from "../theme";
 
 type Props = {
   title: string;
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   base: {
     minHeight: 48,
     paddingHorizontal: space.lg,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -88,8 +88,10 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   label: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   labelOnPrimary: {
     color: "#FFFFFF",

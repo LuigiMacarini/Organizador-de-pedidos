@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { colors, radii, space } from "../theme";
+import { colors, fonts, radii, space } from "../theme";
 
 type Props = {
   value: string;
@@ -51,6 +51,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    fontFamily: fonts.body,
     fontSize: 16,
     color: colors.text,
     paddingVertical: space.sm,

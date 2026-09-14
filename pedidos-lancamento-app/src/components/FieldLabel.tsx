@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors, space } from "../theme";
+import { colors, fonts, space } from "../theme";
 
 export function FieldLabel({
   children,
@@ -25,12 +25,15 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   optional: {
     fontSize: 12,
     color: colors.muted,
+    fontFamily: fonts.body,
   },
 });

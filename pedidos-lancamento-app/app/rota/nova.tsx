@@ -8,7 +8,7 @@ import { ApiError } from "../../src/api/httpClient";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { getOrderTotal } from "../../src/domain/order";
 import { useRoutes } from "../../src/routesContext";
-import { colors, radii, space } from "../../src/theme";
+import { colors, fonts, radii, space } from "../../src/theme";
 import { formatBRL } from "../../src/utils/format";
 import type { Order } from "../../src/types";
 
@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
-  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  emptyTitle: { fontSize: 20, fontFamily: fonts.display, color: colors.text },
+  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, fontFamily: fonts.body },
   list: {
     padding: space.lg,
     paddingBottom: space.xl * 2,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  hint: { color: colors.muted, fontSize: 14, marginBottom: space.xs },
+  hint: { color: colors.muted, fontSize: 14, marginBottom: space.xs, fontFamily: fonts.body },
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -172,8 +172,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  customerName: { fontSize: 16, fontWeight: "700", color: colors.text },
-  meta: { color: colors.muted, fontSize: 13, marginTop: 2 },
+  customerName: { fontSize: 16, fontFamily: fonts.display, color: colors.text },
+  meta: { color: colors.muted, fontSize: 13, marginTop: 2, fontFamily: fonts.body },
   footer: {
     padding: space.lg,
     borderTopWidth: 1,

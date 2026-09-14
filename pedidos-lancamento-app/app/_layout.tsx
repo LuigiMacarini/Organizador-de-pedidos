@@ -1,4 +1,7 @@
+import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from "@expo-google-fonts/barlow";
+import { BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold } from "@expo-google-fonts/barlow-condensed";
 import * as Sentry from "@sentry/react-native";
+import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -9,7 +12,7 @@ import { CustomersProvider } from "../src/customersContext";
 import { OrdersProvider } from "../src/ordersContext";
 import { ProductsProvider } from "../src/productsContext";
 import { RoutesProvider } from "../src/routesContext";
-import { colors } from "../src/theme";
+import { colors, fonts } from "../src/theme";
 import type { AuthUser } from "../src/types";
 import { markStartup } from "../src/utils/startupTiming";
 
@@ -36,7 +39,7 @@ Sentry.init({
 const screenOptions = {
   headerShadowVisible: false,
   headerStyle: { backgroundColor: colors.bg },
-  headerTitleStyle: { fontWeight: "700" as const, color: colors.text },
+  headerTitleStyle: { fontFamily: fonts.display, fontSize: 18, color: colors.text },
   headerTintColor: colors.text,
   contentStyle: { backgroundColor: colors.bg },
 };
@@ -111,6 +114,27 @@ function RootLayout() {
   useEffect(() => {
     markStartup("react_root_rendered");
   }, []);
+
+  const [fontsLoaded, fontError] = useFonts({
+    Barlow_400Regular,
+    Barlow_500Medium,
+    Barlow_600SemiBold,
+    Barlow_700Bold,
+    BarlowCondensed_700Bold,
+    BarlowCondensed_800ExtraBold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) markStartup("fonts_loaded");
+  }, [fontsLoaded, fontError]);
+
+  // Sem fontes ainda: não renderiza nada (splash nativa segue visível
+  // sozinha até o primeiro commit) — é só um instante, carregando asset
+  // local, não é o gargalo de rede que a auditoria de inicialização
+  // resolveu em `authContext.tsx`. Sem `expo-splash-screen`: essa dependência
+  // exige um ícone de splash nativo (Android 12+) que este projeto não tem —
+  // quebrava o build sem trazer benefício real além do que este `return null` já dá.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
