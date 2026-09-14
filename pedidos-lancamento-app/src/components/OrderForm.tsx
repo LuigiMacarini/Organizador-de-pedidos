@@ -3,23 +3,26 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Platform,
   Pressable,
-  SectionList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import type { LineItem, Order, Product } from "../types";
+import type { Customer, LineItem, Order, Product } from "../types";
+import { useCustomers } from "../customersContext";
 import { useProducts } from "../productsContext";
-import { colors, radii, space } from "../theme";
+import { colors, fonts, radii, space } from "../theme";
 import { CustomerSelect } from "./CustomerSelect";
 import { FieldLabel } from "./FieldLabel";
 import { PrimaryButton } from "./PrimaryButton";
 import { SearchBar } from "./SearchBar";
 import { OrderSummary } from "./order-form/OrderSummary";
 import { ProductRow } from "./order-form/ProductRow";
+import { formatBRL } from "../utils/format";
 
 type Props = {
   initial?: Partial<Pick<Order, "customerId" | "customerName" | "items" | "notes">>;
@@ -32,20 +35,31 @@ type Props = {
   }) => Promise<void> | void;
   /** Arquiva (não apaga) — mantém o pedido no histórico. */
   onArchive?: () => Promise<void> | void;
+  /** Só faz sentido na criação (sem `initial`) — "descartar e voltar" na etapa de resumo. */
+  onCancel?: () => void;
   busy?: boolean;
 };
 
 const MAX_QTY = 1_000_000;
 
-export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: Props) {
+function formatAddress(customer: Customer): string | null {
+  const line1 = [customer.street, customer.number].filter(Boolean).join(", ");
+  const line2 = [customer.neighborhood, customer.city, customer.state].filter(Boolean).join(", ");
+  const label = [line1, line2].filter(Boolean).join(" — ");
+  return label || null;
+}
+
+export function OrderForm({ initial, submitLabel, onSubmit, onArchive, onCancel, busy }: Props) {
   const { loading: loadingProducts, searchSections } = useProducts();
+  const { customers } = useCustomers();
+  const [step, setStep] = useState<1 | 2>(1);
   const [customerId, setCustomerId] = useState<string | undefined>(initial?.customerId);
   const [customerName, setCustomerName] = useState(initial?.customerName ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<LineItem[]>(initial?.items ?? []);
-  /** Só uma categoria fica aberta por vez — reduz o quanto aparece na tela de uma vez. */
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  /** Só uma categoria ativa por vez — vira filtro no topo, não acordeão de seções. */
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const qtyByProduct = useMemo(() => {
     const map = new Map<string, number>();
@@ -53,18 +67,19 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: P
     return map;
   }, [items]);
 
-  const sections = useMemo(
-    () =>
-      searchSections(query).map((sec) => ({ title: sec.category, data: sec.products })),
-    [searchSections, query]
-  );
+  const sections = useMemo(() => searchSections(query), [searchSections, query]);
 
-  // Busca que sobra só uma categoria: abre ela direto, sem precisar tocar.
+  // A categoria ativa some da busca atual (ex.: usuário digitou um código de
+  // outra categoria) — troca sozinho pra primeira categoria que ainda tem
+  // resultado, em vez de deixar a tela "travada" numa categoria vazia.
   useEffect(() => {
-    if (sections.length === 1) {
-      setExpandedCategory(sections[0].title);
+    if (sections.length === 0) return;
+    if (!sections.some((s) => s.category === activeCategory)) {
+      setActiveCategory(sections[0].category);
     }
-  }, [sections]);
+  }, [sections, activeCategory]);
+
+  const activeSection = sections.find((s) => s.category === activeCategory) ?? null;
 
   const adjustProductQty = useCallback((p: Product, delta: number) => {
     if (delta === 0) return;
@@ -125,137 +140,209 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, busy }: P
     ]);
   }, [onArchive]);
 
-  const header = (
-    <View style={styles.headerBlock}>
-      <View style={styles.card}>
-        <FieldLabel>Cliente</FieldLabel>
-        <CustomerSelect
-          customerId={customerId}
+  const totalUnits = items.reduce((acc, l) => acc + l.qty, 0);
+  const totalValue = items.reduce((acc, l) => acc + l.unitPrice * l.qty, 0);
+  const selectedCustomer = customerId ? customers.find((c) => c.id === customerId) : undefined;
+
+  if (step === 2) {
+    return (
+      <ScrollView style={styles.list} contentContainerStyle={styles.stepTwoContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.stepBadgeRow}>
+          <Pressable onPress={() => setStep(1)} hitSlop={8} style={styles.backLink}>
+            <Ionicons name="chevron-back" size={16} color={colors.primary} />
+            <Text style={styles.backLinkText}>Catálogo</Text>
+          </Pressable>
+          <Text style={styles.stepBadge}>Etapa 2/2</Text>
+        </View>
+
+        <OrderSummary
           customerName={customerName}
-          onSelect={({ id, name }) => {
-            setCustomerId(id);
-            setCustomerName(name);
-          }}
+          customerAddress={selectedCustomer ? formatAddress(selectedCustomer) : null}
+          items={items}
         />
-      </View>
 
-      <View style={styles.searchBlock}>
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Nome do produto ou código (ex: p12)"
-        />
-        {loadingProducts ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" />
-            <Text style={styles.loadingText}>Carregando catálogo…</Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
+        <View style={styles.card}>
+          <FieldLabel optional>Observações</FieldLabel>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Instruções de entrega, tamanhos, etc."
+            placeholderTextColor={colors.muted}
+            style={[styles.input, styles.textarea]}
+            multiline
+          />
+        </View>
 
-  const footer = (
-    <View style={styles.footerBlock}>
-      <View style={styles.card}>
-        <FieldLabel optional>Observações</FieldLabel>
-        <TextInput
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Instruções de entrega, tamanhos, etc."
-          placeholderTextColor={colors.muted}
-          style={[styles.input, styles.textarea]}
-          multiline
-        />
-      </View>
-
-      <OrderSummary customerName={customerName} items={items} />
-
-      <PrimaryButton
-        title={submitLabel}
-        onPress={() => void handleSubmit()}
-        loading={busy}
-        disabled={busy}
-        style={styles.submitButton}
-      />
-
-      {onArchive ? (
         <PrimaryButton
-          title="Arquivar pedido"
-          variant="ghost"
-          onPress={handleArchive}
+          title={submitLabel}
+          onPress={() => void handleSubmit()}
+          loading={busy}
           disabled={busy}
-          style={{ marginTop: space.sm }}
+          style={styles.submitButton}
         />
-      ) : null}
-    </View>
-  );
+
+        {/* "Salvar rascunho" do design não tem hoje onde persistir (não existe
+            conceito de pedido em rascunho no backend) — em vez de fingir que
+            salva algo, só volta pra lista sem gravar. Se quiser rascunho de
+            verdade (local no aparelho, ou no servidor), é uma decisão à parte. */}
+        {!initial && onCancel ? (
+          <PrimaryButton
+            title="Descartar e voltar"
+            variant="ghost"
+            onPress={onCancel}
+            disabled={busy}
+            style={{ marginTop: space.sm }}
+          />
+        ) : null}
+
+        {onArchive ? (
+          <PrimaryButton
+            title="Arquivar pedido"
+            variant="ghost"
+            onPress={handleArchive}
+            disabled={busy}
+            style={{ marginTop: space.sm }}
+          />
+        ) : null}
+      </ScrollView>
+    );
+  }
 
   return (
-    <SectionList
-      style={styles.list}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      stickySectionHeadersEnabled
-      sections={sections}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={header}
-      ListFooterComponent={footer}
+    <View style={{ flex: 1 }}>
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        data={activeSection?.products ?? []}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+        <View style={styles.headerBlock}>
+          <View style={styles.stepBadgeRow}>
+            <View />
+            <Text style={styles.stepBadge}>Etapa 1/2</Text>
+          </View>
+
+          <View style={styles.card}>
+            <FieldLabel>Cliente</FieldLabel>
+            <CustomerSelect
+              customerId={customerId}
+              customerName={customerName}
+              onSelect={({ id, name }) => {
+                setCustomerId(id);
+                setCustomerName(name);
+              }}
+            />
+          </View>
+
+          <View style={styles.searchBlock}>
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Nome do produto ou código (ex: p12)"
+            />
+            {loadingProducts ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" />
+                <Text style={styles.loadingText}>Carregando catálogo…</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {sections.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
+              {sections.map((s) => {
+                const active = s.category === activeCategory;
+                return (
+                  <Pressable
+                    key={s.category}
+                    onPress={() => setActiveCategory(s.category)}
+                    style={[styles.pill, active && styles.pillActive]}
+                  >
+                    <Text style={[styles.pillText, active && styles.pillTextActive]} numberOfLines={1}>
+                      {s.category} {s.products.length}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
+          {activeSection ? (
+            <Text style={styles.sectionTitle}>
+              {activeSection.category} · {activeSection.products.length}{" "}
+              {activeSection.products.length === 1 ? "item" : "itens"}
+            </Text>
+          ) : null}
+        </View>
+      }
       ListEmptyComponent={
         <Text style={styles.noResults}>Nenhum produto encontrado para esta busca.</Text>
       }
-      renderSectionHeader={({ section }) => {
-        const isOpen = section.title === expandedCategory;
-        return (
-          <Pressable
-            onPress={() => setExpandedCategory(isOpen ? null : section.title)}
-            style={({ pressed }) => [styles.sectionHeader, pressed && styles.sectionHeaderPressed]}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isOpen }}
-          >
-            <Text style={styles.sectionTitle} numberOfLines={1}>
-              {section.title}
-            </Text>
-            <View style={styles.sectionRight}>
-              <Text style={styles.sectionCount}>{section.data.length}</Text>
-              <Ionicons
-                name={isOpen ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.muted}
-              />
-            </View>
-          </Pressable>
-        );
-      }}
-      renderItem={({ item, section }) => {
-        if (section.title !== expandedCategory) return null;
-        return (
+        renderItem={({ item }) => (
           <ProductRow
             product={item}
             qty={qtyByProduct.get(item.id) ?? 0}
             onAdjust={adjustProductQty}
             onSetQty={setProductQtyAbsolute}
           />
-        );
-      }}
-    />
+        )}
+      />
+
+      {/* Fora da FlatList de propósito — fica fixa embaixo mostrando o total
+          corrente, em vez de rolar junto com os produtos. */}
+      <View style={styles.footerBar}>
+        <View>
+          <Text style={styles.footerMeta}>
+            {items.length} {items.length === 1 ? "item" : "itens"} · {totalUnits}{" "}
+            {totalUnits === 1 ? "unidade" : "unidades"}
+          </Text>
+          <Text style={styles.footerTotal}>{formatBRL(totalValue)}</Text>
+        </View>
+        <PrimaryButton
+          title="Revisar pedido"
+          onPress={() => setStep(2)}
+          disabled={items.length === 0}
+          style={styles.footerButton}
+        />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   list: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: space.xl * 2 },
-  headerBlock: {
+  content: { paddingBottom: space.lg },
+  stepTwoContent: {
     padding: space.lg,
-    paddingBottom: 0,
+    paddingBottom: space.xl * 2,
     gap: space.md,
     maxWidth: 720,
     width: "100%",
     alignSelf: "center",
   },
-  footerBlock: {
+  stepBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backLink: { flexDirection: "row", alignItems: "center", gap: 2 },
+  backLinkText: { color: colors.primary, fontFamily: fonts.bodySemiBold, fontSize: 14 },
+  stepBadge: {
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+  },
+  headerBlock: {
     padding: space.lg,
-    paddingTop: space.md,
+    paddingBottom: space.sm,
     gap: space.md,
     maxWidth: 720,
     width: "100%",
@@ -263,7 +350,7 @@ const styles = StyleSheet.create({
   },
   searchBlock: { gap: space.xs },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: space.xs, paddingTop: space.xs },
-  loadingText: { color: colors.muted, fontSize: 13 },
+  loadingText: { color: colors.muted, fontSize: 13, fontFamily: fonts.body },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
@@ -278,39 +365,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     fontSize: 16,
+    fontFamily: fonts.body,
     color: colors.text,
     backgroundColor: colors.surface,
   },
   textarea: { minHeight: 96, textAlignVertical: "top" },
+  submitButton: { marginTop: space.xs },
+  pillsRow: { gap: space.xs, paddingVertical: 2 },
+  pill: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  pillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  pillText: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  pillTextActive: { color: "#fff" },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginTop: space.xs,
+  },
   noResults: {
     fontSize: 14,
     color: colors.muted,
     paddingVertical: space.lg,
+    paddingHorizontal: space.lg,
     textAlign: "center",
+    fontFamily: fonts.body,
   },
-  sectionHeader: {
+  footerBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: space.sm,
-    minHeight: 52,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    backgroundColor: colors.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: space.md,
+    padding: space.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     maxWidth: 720,
     width: "100%",
     alignSelf: "center",
   },
-  sectionHeaderPressed: { backgroundColor: colors.border },
-  sectionTitle: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  sectionRight: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  sectionCount: { fontSize: 13, color: colors.muted },
-  submitButton: { marginTop: space.xs },
+  footerMeta: { fontSize: 12, color: colors.muted, fontFamily: fonts.body },
+  footerTotal: { fontSize: 20, fontFamily: fonts.displayBlack, color: colors.text },
+  footerButton: { flexShrink: 0 },
 });

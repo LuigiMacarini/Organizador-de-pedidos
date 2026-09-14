@@ -10,7 +10,7 @@ import { RouteMap, type MapStop } from "../../src/components/RouteMap";
 import { getCurrentDeliveryPosition, useDeliveryLocation } from "../../src/hooks/useDeliveryLocation";
 import { useNavigationAnnouncements } from "../../src/hooks/useNavigationAnnouncements";
 import { useRoutes } from "../../src/routesContext";
-import { colors, radii, space } from "../../src/theme";
+import { colors, fonts, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
 
 const STATUS_LABEL: Record<RouteStatus, string> = {
@@ -225,23 +225,34 @@ export default function RotaDetalheScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
               <Text style={styles.statusBadge}>{STATUS_LABEL[route.status]}</Text>
-              <View style={styles.summaryTopRight}>
-                <Text style={styles.summaryMeta}>
-                  {formatDistance(route.totalDistanceMeters)} · {formatDuration(route.totalDurationSeconds)}
-                </Text>
-                {canExecute ? (
-                  <Pressable
-                    onPress={() => setVoiceMuted((prev) => !prev)}
-                    hitSlop={8}
-                    accessibilityLabel={voiceMuted ? "Ativar voz da navegação" : "Silenciar voz da navegação"}
-                  >
-                    <Ionicons
-                      name={voiceMuted ? "volume-mute-outline" : "volume-high-outline"}
-                      size={20}
-                      color={colors.muted}
-                    />
-                  </Pressable>
-                ) : null}
+              {canExecute ? (
+                <Pressable
+                  onPress={() => setVoiceMuted((prev) => !prev)}
+                  hitSlop={8}
+                  accessibilityLabel={voiceMuted ? "Ativar voz da navegação" : "Silenciar voz da navegação"}
+                >
+                  <Ionicons
+                    name={voiceMuted ? "volume-mute-outline" : "volume-high-outline"}
+                    size={20}
+                    color={colors.muted}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+            <View style={styles.statsRow}>
+              <View style={styles.statTile}>
+                <Text style={styles.statLabel}>Paradas</Text>
+                <Text style={styles.statValue}>{route.deliveries.length}</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statTile}>
+                <Text style={styles.statLabel}>Distância</Text>
+                <Text style={styles.statValue}>{formatDistance(route.totalDistanceMeters)}</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statTile}>
+                <Text style={styles.statLabel}>Tempo</Text>
+                <Text style={styles.statValue}>{formatDuration(route.totalDurationSeconds)}</Text>
               </View>
             </View>
           </View>
@@ -293,19 +304,27 @@ export default function RotaDetalheScreen() {
               {canExecute && delivery.status === "PENDING" ? (
                 <View style={styles.stopActions}>
                   <PrimaryButton
-                    title="Entregue"
+                    title="Marcar entregue"
                     onPress={() => void handleDeliveryStatus(delivery.id, "DELIVERED")}
                     loading={busyDeliveryId === delivery.id}
                     disabled={busyDeliveryId !== null}
-                    style={styles.stopActionBtn}
                   />
-                  <PrimaryButton
-                    title="Não entregue"
-                    variant="ghost"
-                    onPress={() => void handleDeliveryStatus(delivery.id, "FAILED")}
-                    disabled={busyDeliveryId !== null}
-                    style={styles.stopActionBtn}
-                  />
+                  <View style={styles.stopActionsRow}>
+                    <PrimaryButton
+                      title="Navegar"
+                      variant="ghost"
+                      onPress={() => setFocusedStopId(delivery.id)}
+                      disabled={busyDeliveryId !== null}
+                      style={styles.stopActionBtn}
+                    />
+                    <PrimaryButton
+                      title="Não entregue"
+                      variant="ghost"
+                      onPress={() => void handleDeliveryStatus(delivery.id, "FAILED")}
+                      disabled={busyDeliveryId !== null}
+                      style={styles.stopActionBtn}
+                    />
+                  </View>
                 </View>
               ) : null}
             </Pressable>
@@ -366,15 +385,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   summaryTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  summaryTopRight: { flexDirection: "row", alignItems: "center", gap: space.sm },
   statusBadge: {
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  summaryMeta: { fontSize: 14, color: colors.muted, fontWeight: "600" },
+  statsRow: { flexDirection: "row", alignItems: "center" },
+  statTile: { flex: 1, alignItems: "center", gap: 2 },
+  statDivider: { width: StyleSheet.hairlineWidth, alignSelf: "stretch", backgroundColor: colors.border },
+  statLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  statValue: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
   stopCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
@@ -412,14 +440,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  stopNumberText: { fontWeight: "800", color: colors.text },
+  stopNumberText: { fontFamily: fonts.displayBlack, color: colors.text },
   stopNumberTextNext: { color: "#fff" },
-  stopCustomer: { fontSize: 16, fontWeight: "700", color: colors.text },
-  stopAddress: { fontSize: 14, color: colors.muted, lineHeight: 20 },
-  stopStatus: { fontSize: 13, color: colors.muted, marginTop: 2, fontWeight: "600" },
+  stopCustomer: { fontSize: 16, fontFamily: fonts.display, color: colors.text },
+  stopAddress: { fontSize: 14, color: colors.muted, lineHeight: 20, fontFamily: fonts.body },
+  stopStatus: { fontSize: 13, color: colors.muted, marginTop: 2, fontFamily: fonts.bodySemiBold },
   stopStatusOk: { color: colors.primary },
   stopStatusFailed: { color: colors.danger },
-  stopActions: { flexDirection: "row", gap: space.sm },
+  stopActions: { gap: space.sm },
+  stopActionsRow: { flexDirection: "row", gap: space.sm },
   stopActionBtn: { flex: 1 },
   footer: {
     padding: space.lg,

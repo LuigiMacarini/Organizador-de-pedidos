@@ -11,9 +11,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SearchBar } from "../../src/components/SearchBar";
+import { useCustomers } from "../../src/customersContext";
 import { getOrderTotal, getOrderUnits } from "../../src/domain/order";
 import { useOrders } from "../../src/ordersContext";
-import { colors, radii, space } from "../../src/theme";
+import { colors, fonts, radii, space } from "../../src/theme";
 import { formatBRL } from "../../src/utils/format";
 import type { Order } from "../../src/types";
 
@@ -40,10 +41,43 @@ function groupByCustomer(orders: Order[]): Group[] {
   );
 }
 
+function isToday(timestamp: number): boolean {
+  const d = new Date(timestamp);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export default function PedidosScreen() {
   const router = useRouter();
   const { orders, loading } = useOrders();
+  const { customers } = useCustomers();
   const [query, setQuery] = useState("");
+
+  // `useOrders()` só traz pedidos PENDING (ainda não roteirizados) — assim
+  // que um pedido entra numa rota ele some daqui por desenho (ver
+  // ordersContext.tsx). "Sem endereço" é derivado do cliente, não do pedido
+  // em si, por isso o cruzamento com useCustomers().
+  const geocodedCustomerIds = useMemo(
+    () => new Set(customers.filter((c) => c.geocodeStatus === "OK").map((c) => c.id)),
+    [customers]
+  );
+
+  const todayStats = useMemo(() => {
+    const todayOrders = orders.filter((o) => isToday(o.createdAt));
+    return {
+      count: todayOrders.length,
+      value: todayOrders.reduce((sum, o) => sum + getOrderTotal(o.items), 0),
+    };
+  }, [orders]);
+
+  const deliverableCount = useMemo(
+    () => orders.filter((o) => geocodedCustomerIds.has(o.customerId)).length,
+    [orders, geocodedCustomerIds]
+  );
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,6 +108,27 @@ export default function PedidosScreen() {
           <Text style={styles.ctaText}>+ Novo</Text>
         </Pressable>
       </View>
+
+      {!loading && orders.length > 0 ? (
+        <View style={styles.statsRow}>
+          <View style={styles.statTile}>
+            <Text style={styles.statLabel}>Hoje</Text>
+            <Text style={styles.statValue}>
+              {todayStats.count} {todayStats.count === 1 ? "pedido" : "pedidos"}
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statTile}>
+            <Text style={styles.statLabel}>Valor</Text>
+            <Text style={styles.statValue}>{formatBRL(todayStats.value)}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statTile}>
+            <Text style={styles.statLabel}>A entregar</Text>
+            <Text style={styles.statValue}>{deliverableCount}</Text>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Buscar por cliente" />
@@ -112,13 +167,13 @@ export default function PedidosScreen() {
                   {g.customerName}
                 </Text>
                 <Text style={styles.groupMeta}>
-                  {g.orders.length} {g.orders.length === 1 ? "pedido" : "pedidos"} ·{" "}
-                  {formatBRL(g.total)}
+                  {g.orders.length} · {formatBRL(g.total)}
                 </Text>
               </View>
               {g.orders.map((o) => {
                 const units = getOrderUnits(o.items);
                 const total = getOrderTotal(o.items);
+                const hasAddress = geocodedCustomerIds.has(o.customerId);
                 return (
                   <Pressable
                     key={o.id}
@@ -130,15 +185,20 @@ export default function PedidosScreen() {
                         {o.items.length} {o.items.length === 1 ? "item" : "itens"} · {units}{" "}
                         {units === 1 ? "unidade" : "unidades"}
                       </Text>
-                      {o.notes?.trim() ? (
-                        <View style={styles.notesBox}>
-                          <Text style={styles.notesLabel}>Observações</Text>
-                          <Text style={styles.notesValue} numberOfLines={3} ellipsizeMode="tail">
-                            {o.notes.trim()}
-                          </Text>
-                        </View>
-                      ) : null}
+                      <View style={[styles.statusPill, !hasAddress && styles.statusPillWarn]}>
+                        <Text style={[styles.statusPillText, !hasAddress && styles.statusPillTextWarn]}>
+                          {hasAddress ? "Em aberto" : "Sem endereço"}
+                        </Text>
+                      </View>
                     </View>
+                    {o.notes?.trim() ? (
+                      <View style={styles.notesBox}>
+                        <Text style={styles.notesLabel}>Observações</Text>
+                        <Text style={styles.notesValue} numberOfLines={3} ellipsizeMode="tail">
+                          {o.notes.trim()}
+                        </Text>
+                      </View>
+                    ) : null}
                     <View style={styles.cardBottom}>
                       <Text style={styles.meta}>
                         {new Date(o.updatedAt).toLocaleString("pt-BR", {
@@ -172,8 +232,14 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  title: { fontSize: 26, fontWeight: "800", color: colors.text },
-  subtitle: { marginTop: 4, color: colors.muted, fontSize: 14 },
+  title: {
+    fontFamily: fonts.displayBlack,
+    fontSize: 28,
+    letterSpacing: 0.2,
+    color: colors.text,
+    textTransform: "uppercase",
+  },
+  subtitle: { marginTop: 2, color: colors.muted, fontSize: 14, fontFamily: fonts.body },
   iconBtn: {
     width: 44,
     height: 44,
@@ -192,7 +258,31 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
   },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  ctaText: { color: "#fff", fontFamily: fonts.bodySemiBold, fontSize: 14 },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    marginHorizontal: space.lg,
+    marginBottom: space.sm,
+    paddingVertical: space.sm,
+    maxWidth: 720,
+    width: "auto",
+    alignSelf: "center",
+  },
+  statTile: { flex: 1, alignItems: "center", gap: 2 },
+  statDivider: { width: StyleSheet.hairlineWidth, alignSelf: "stretch", backgroundColor: colors.border },
+  statLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  statValue: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
   searchWrap: {
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
@@ -201,7 +291,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm },
-  loadingText: { color: colors.muted },
+  loadingText: { color: colors.muted, fontFamily: fonts.body },
   emptyBox: {
     flex: 1,
     padding: space.xl,
@@ -211,8 +301,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
-  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
+  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, fontFamily: fonts.body },
   ctaWide: {
     marginTop: space.sm,
     backgroundColor: colors.primary,
@@ -220,7 +310,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     alignItems: "center",
   },
-  ctaWideText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  ctaWideText: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 16, textTransform: "uppercase" },
   list: {
     paddingHorizontal: space.lg,
     paddingBottom: space.xl * 2,
@@ -237,19 +327,36 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingHorizontal: space.xs,
   },
-  groupName: { fontSize: 18, fontWeight: "800", color: colors.text, flexShrink: 1 },
-  groupMeta: { fontSize: 13, color: colors.muted, fontWeight: "600" },
+  groupName: { fontFamily: fonts.display, fontSize: 18, color: colors.text, flexShrink: 1 },
+  groupMeta: { fontSize: 13, color: colors.muted, fontFamily: fonts.bodySemiBold },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
     padding: space.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: space.xs,
   },
-  cardTop: { gap: 6, minWidth: 0 },
-  badge: { color: colors.muted, fontSize: 13 },
+  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm },
+  badge: { color: colors.muted, fontSize: 13, fontFamily: fonts.body },
+  statusPill: {
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusPillWarn: { backgroundColor: colors.dangerSoft, borderColor: colors.dangerSoft },
+  statusPillText: {
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  statusPillTextWarn: { color: colors.danger },
   notesBox: {
-    marginTop: space.sm,
     paddingTop: space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
@@ -259,20 +366,20 @@ const styles = StyleSheet.create({
   },
   notesLabel: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
     color: colors.muted,
     textTransform: "uppercase",
     letterSpacing: 0.4,
     marginBottom: 4,
   },
-  notesValue: { fontSize: 13, color: colors.text, lineHeight: 18 },
+  notesValue: { fontSize: 13, color: colors.text, lineHeight: 18, fontFamily: fonts.body },
   cardBottom: {
-    marginTop: space.md,
+    marginTop: space.xs,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
     gap: space.md,
   },
-  meta: { color: colors.muted, fontSize: 12 },
-  total: { fontSize: 16, fontWeight: "900", color: colors.text },
+  meta: { color: colors.muted, fontSize: 12, fontFamily: fonts.body },
+  total: { fontSize: 17, fontFamily: fonts.displayBlack, color: colors.text },
 });

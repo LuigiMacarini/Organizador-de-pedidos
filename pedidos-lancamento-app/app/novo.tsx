@@ -19,6 +19,7 @@ export default function NovoPedidoScreen() {
         <OrderForm
           submitLabel="Finalizar lançamento"
           busy={busy}
+          onCancel={() => router.back()}
           onSubmit={async (payload) => {
             setBusy(true);
             try {

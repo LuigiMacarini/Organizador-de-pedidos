@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { remoteAutocompleteAddress, remotePlaceDetails, type PlaceSuggestion } from "../api/placesRemote";
-import { colors, radii, space } from "../theme";
+import { colors, fonts, radii, space } from "../theme";
 import type { Customer } from "../types";
 import { FieldLabel } from "./FieldLabel";
 import { PrimaryButton } from "./PrimaryButton";
@@ -309,6 +310,10 @@ export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }:
         ) : hasAddress && !searchOpen ? (
           <>
             <View style={styles.summaryCard}>
+              <View style={styles.summaryHeader}>
+                <Ionicons name="location" size={14} color={colors.primary} />
+                <Text style={styles.summaryLabel}>Localização confirmada</Text>
+              </View>
               <Text style={styles.summaryText}>{formatAddressSummary(address)}</Text>
             </View>
             <View style={styles.linkRowGroup}>
@@ -428,6 +433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     fontSize: 16,
+    fontFamily: fonts.body,
     color: colors.text,
     backgroundColor: colors.surface,
   },
@@ -440,6 +446,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: space.sm,
+    fontFamily: fonts.body,
   },
   row: {
     flexDirection: "row",
@@ -458,13 +465,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary,
     padding: space.md,
+    gap: 4,
+  },
+  summaryHeader: { flexDirection: "row", alignItems: "center", gap: 4 },
+  summaryLabel: {
+    color: colors.primary,
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   summaryText: {
     color: colors.text,
     fontSize: 14,
     lineHeight: 20,
+    fontFamily: fonts.body,
   },
   linkRowGroup: {
     flexDirection: "row",
@@ -478,12 +495,12 @@ const styles = StyleSheet.create({
   linkText: {
     color: colors.primary,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: fonts.bodyBold,
   },
   linkTextMuted: {
     color: colors.muted,
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
   },
   searchStatus: {
     flexDirection: "row",
@@ -494,6 +511,7 @@ const styles = StyleSheet.create({
   searchStatusText: {
     color: colors.muted,
     fontSize: 13,
+    fontFamily: fonts.body,
   },
   suggestionsBox: {
     marginTop: space.sm,
@@ -511,10 +529,12 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: colors.text,
     fontSize: 14,
+    fontFamily: fonts.body,
   },
   searchEmptyText: {
     color: colors.muted,
     fontSize: 13,
     marginTop: space.sm,
+    fontFamily: fonts.body,
   },
 });
