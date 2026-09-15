@@ -97,12 +97,7 @@ export default function ClientesScreen() {
       </View>
 
       {!loading && customers.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filtersWrap}
-          contentContainerStyle={styles.filtersRow}
-        >
+        <View style={styles.filtersRow}>
           {(
             [
               { key: "all", label: "Todos", count: customers.length },
@@ -126,7 +121,7 @@ export default function ClientesScreen() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
       ) : null}
 
       {loading ? (
@@ -234,26 +229,25 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  // Altura fixa é essencial aqui: um ScrollView horizontal sem altura própria
-  // vira um item flexível comum dentro da coluna da tela — quando a lista de
-  // resultados abaixo encolhe (poucos clientes no filtro), ele "rouba" esse
-  // espaço sobrando e os pills esticam verticalmente pra preencher (bug
-  // visto com o filtro "Sem endereço", que tem só 1 resultado). A primeira
-  // tentativa (só altura no wrapper, sem altura no próprio pill) cortava o
-  // texto — o `paddingBottom` sobrando no `filtersRow` comia espaço demais
-  // dentro dos 40px. Agora o pill tem altura própria (32) livre de padding
-  // vertical, centralizado numa faixa de 44 (mesmo padrão dos botões-ícone).
-  filtersWrap: { height: 44, marginBottom: space.xs, maxWidth: 720, width: "100%", alignSelf: "center" },
+  // Só 3 opções curtas — cabem numa linha só em qualquer celular, sem
+  // precisar de ScrollView horizontal. Isso elimina de vez o problema de
+  // altura: era o ScrollView (cross-axis entre plataformas nativo/web se
+  // comporta diferente) que causava esticar/cortar em cada tentativa
+  // anterior. Uma `View` com `flexWrap` nunca tem esse tipo de bug.
   filtersRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     paddingHorizontal: space.lg,
+    marginBottom: space.sm,
     gap: space.xs,
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
   },
   filterPill: {
-    height: 32,
-    justifyContent: "center",
     paddingHorizontal: space.md,
+    paddingVertical: space.sm,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
