@@ -94,3 +94,48 @@ export type Customer = {
   createdAt: number;
   updatedAt: number;
 };
+
+export type MonthlySummary = {
+  revenue: number;
+  orderCount: number;
+  customerCount: number;
+  productUnits: number;
+  /** `null` quando não houve nenhum pedido no período — não força um ticket médio de base vazia. */
+  avgTicket: number | null;
+};
+
+export type CustomerSummaryRow = {
+  customerId: string;
+  customerName: string;
+  orderCount: number;
+  total: number;
+};
+
+export type ProductSummaryRow = {
+  productId: string;
+  productName: string;
+  unitsSold: number;
+  revenue: number;
+};
+
+export type MonthComparison = {
+  previousMonth: string | null;
+  previousLabel: string | null;
+  previousSummary: MonthlySummary | null;
+  variation: {
+    revenue: number | null;
+    orderCount: number | null;
+    customerCount: number | null;
+    productUnits: number | null;
+  };
+};
+
+export type MonthlyClosing = {
+  month: string;
+  monthLabel: string;
+  summary: MonthlySummary;
+  byCustomer: CustomerSummaryRow[];
+  byProduct: ProductSummaryRow[];
+  comparison: MonthComparison;
+  availableMonths: string[];
+};

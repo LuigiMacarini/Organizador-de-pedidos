@@ -123,6 +123,7 @@ model Order {
 
   @@index([customerId])
   @@index([updatedAt])
+  @@index([createdAt])
   @@index([status])
   @@index([shipmentId])
 }

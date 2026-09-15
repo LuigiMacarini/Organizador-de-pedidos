@@ -97,7 +97,7 @@ function AppShell() {
               <Stack.Screen name="cliente/novo" options={{ title: "Novo cliente" }} />
               <Stack.Screen name="cliente/[id]" options={{ title: "Cliente" }} />
               <Stack.Screen name="clientes/importar" options={{ title: "Importar clientes" }} />
-              <Stack.Screen name="fechar-mes" options={{ title: "Fechar mês" }} />
+              <Stack.Screen name="fechar-mes" options={{ title: "Fechamento mensal" }} />
               <Stack.Screen name="rota/nova" options={{ title: "Nova rota" }} />
               <Stack.Screen name="rota/[id]" options={{ title: "Rota" }} />
             </Stack>
