@@ -16,7 +16,7 @@
     "@expo-google-fonts/barlow": "^0.4.1",
     "@expo-google-fonts/barlow-condensed": "^0.4.1",
     "@expo/vector-icons": "~14.0.4",
-    "@sentry/react-native": "~6.10.0",
+    "@sentry/react-native": "^8.26.0",
     "expo": "~52.0.28",
     "expo-constants": "~17.0.5",
     "expo-dev-client": "~5.0.20",

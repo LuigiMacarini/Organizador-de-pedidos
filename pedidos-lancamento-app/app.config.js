@@ -19,6 +19,15 @@ module.exports = () => ({
         // inseguro (fica exposto na config resolvida). Ele é lido direto de
         // SENTRY_AUTH_TOKEN no ambiente do build (EAS secret), sem passar
         // pelo JS deste arquivo.
+        //
+        // Sem isso, profiling contínuo nunca funciona no Android via Expo —
+        // o plugin não liga o Sentry Android Gradle Plugin sozinho (issue
+        // conhecida do próprio getsentry/sentry-react-native). "experimental"
+        // é o nome que a própria lib usa pra essa chave, não indica
+        // instabilidade além do normal do recurso de profiling em si.
+        experimental_android: {
+          enableAndroidGradlePlugin: true,
+        },
       },
     ],
   ],
