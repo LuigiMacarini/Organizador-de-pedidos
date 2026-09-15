@@ -90,7 +90,18 @@ export async function remove(id: string) {
   try {
     await prisma.customer.delete({ where: { id } });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
+    // P2003 é o código que o Prisma normalmente usa pra violação de chave
+    // estrangeira — mas a constraint de `Order.customerId` é RESTRICT
+    // (nunca CASCADE, de propósito: apagar cliente não pode levar pedidos
+    // junto), e pra esse tipo específico o Postgres manda o SQLSTATE 23001
+    // ("restrict_violation"), que o Prisma não reconhece como erro
+    // "conhecido" — vira `PrismaClientUnknownRequestError` genérico e cai
+    // fora do `instanceof` de cima, virando 500 cru em vez da mensagem
+    // amigável (confirmado em produção). Cobre os dois casos.
+    const isForeignKeyViolation =
+      (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") ||
+      (e instanceof Prisma.PrismaClientUnknownRequestError && /23001|23503/.test(e.message));
+    if (isForeignKeyViolation) {
       throw new AppError(
         "Este cliente tem pedidos no histórico e não pode ser excluído",
         409
