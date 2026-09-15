@@ -97,9 +97,9 @@ export default function PedidosScreen() {
         <Pressable
           onPress={() => router.push("/fechar-mes")}
           style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
-          accessibilityLabel="Arquivar pedidos do mês"
+          accessibilityLabel="Fechamento mensal"
         >
-          <Ionicons name="archive-outline" size={20} color={colors.muted} />
+          <Ionicons name="bar-chart-outline" size={20} color={colors.muted} />
         </Pressable>
         <Pressable
           onPress={() => router.push("/novo")}

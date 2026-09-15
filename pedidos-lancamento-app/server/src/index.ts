@@ -10,6 +10,7 @@ import orderRoutes from "./interface/http/routes/orders.js";
 import routeRoutes from "./interface/http/routes/routes.js";
 import deliveryRoutes from "./interface/http/routes/deliveries.js";
 import placeRoutes from "./interface/http/routes/places.js";
+import reportRoutes from "./interface/http/routes/reports.js";
 
 const PORT = Number(process.env.PORT) || 3333;
 
@@ -33,6 +34,7 @@ async function buildServer() {
   await app.register(routeRoutes);
   await app.register(deliveryRoutes);
   await app.register(placeRoutes);
+  await app.register(reportRoutes);
 
   return app;
 }
