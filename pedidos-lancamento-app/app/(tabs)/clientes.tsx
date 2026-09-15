@@ -238,17 +238,22 @@ const styles = StyleSheet.create({
   // vira um item flexível comum dentro da coluna da tela — quando a lista de
   // resultados abaixo encolhe (poucos clientes no filtro), ele "rouba" esse
   // espaço sobrando e os pills esticam verticalmente pra preencher (bug
-  // visto com o filtro "Sem endereço", que tem só 1 resultado).
-  filtersWrap: { height: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
+  // visto com o filtro "Sem endereço", que tem só 1 resultado). A primeira
+  // tentativa (só altura no wrapper, sem altura no próprio pill) cortava o
+  // texto — o `paddingBottom` sobrando no `filtersRow` comia espaço demais
+  // dentro dos 40px. Agora o pill tem altura própria (32) livre de padding
+  // vertical, centralizado numa faixa de 44 (mesmo padrão dos botões-ícone).
+  filtersWrap: { height: 44, marginBottom: space.xs, maxWidth: 720, width: "100%", alignSelf: "center" },
   filtersRow: {
-    paddingHorizontal: space.lg,
-    paddingBottom: space.sm,
-    gap: space.xs,
+    flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: space.lg,
+    gap: space.xs,
   },
   filterPill: {
+    height: 32,
+    justifyContent: "center",
     paddingHorizontal: space.md,
-    paddingVertical: space.xs,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
