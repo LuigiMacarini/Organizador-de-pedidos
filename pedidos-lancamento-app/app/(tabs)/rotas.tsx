@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoutes } from "../../src/routesContext";
-import { colors, radii, space } from "../../src/theme";
+import { colors, fonts, radii, space } from "../../src/theme";
 import type { DeliveryRoute, RouteStatus } from "../../src/types";
 
 const FINISHED_STATUSES: RouteStatus[] = ["COMPLETED", "CANCELED"];
@@ -172,8 +172,14 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  title: { fontSize: 26, fontWeight: "800", color: colors.text },
-  subtitle: { marginTop: 4, color: colors.muted, fontSize: 14 },
+  title: {
+    fontFamily: fonts.displayBlack,
+    fontSize: 28,
+    letterSpacing: 0.2,
+    color: colors.text,
+    textTransform: "uppercase",
+  },
+  subtitle: { marginTop: 2, color: colors.muted, fontSize: 14, fontFamily: fonts.body },
   cta: {
     backgroundColor: colors.primary,
     paddingHorizontal: space.md,
@@ -182,9 +188,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
   },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  ctaText: { color: "#fff", fontFamily: fonts.bodySemiBold, fontSize: 14 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm },
-  loadingText: { color: colors.muted },
+  loadingText: { color: colors.muted, fontFamily: fonts.body },
   emptyBox: {
     flex: 1,
     padding: space.xl,
@@ -194,8 +200,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
-  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  emptyTitle: { fontFamily: fonts.display, fontSize: 20, color: colors.text },
+  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, fontFamily: fonts.body },
   list: {
     padding: space.lg,
     gap: space.xl,
@@ -211,12 +217,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.muted,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  clearLink: { fontSize: 13, fontWeight: "700", color: colors.danger },
+  clearLink: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.danger },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
@@ -228,13 +234,13 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   statusBadge: {
     fontSize: 12,
-    fontWeight: "800",
+    fontFamily: fonts.bodyBold,
     color: colors.primary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  stopCount: { fontSize: 13, color: colors.muted, fontWeight: "600" },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  stopCount: { fontSize: 13, color: colors.muted, fontFamily: fonts.bodySemiBold },
+  cardTitle: { fontSize: 16, fontFamily: fonts.display, color: colors.text },
   cardBottom: { flexDirection: "row", justifyContent: "space-between", marginTop: space.xs },
-  meta: { color: colors.muted, fontSize: 12 },
+  meta: { color: colors.muted, fontSize: 12, fontFamily: fonts.body },
 });

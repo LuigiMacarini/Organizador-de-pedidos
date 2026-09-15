@@ -117,7 +117,10 @@ export default function ClientesScreen() {
                 onPress={() => setFilter(f.key)}
                 style={[styles.filterPill, active && styles.filterPillActive]}
               >
-                <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                <Text
+                  style={[styles.filterPillText, active && styles.filterPillTextActive]}
+                  numberOfLines={1}
+                >
                   {f.label} {f.count}
                 </Text>
               </Pressable>
@@ -231,8 +234,18 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  filtersWrap: { maxWidth: 720, width: "100%", alignSelf: "center" },
-  filtersRow: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.xs },
+  // Altura fixa é essencial aqui: um ScrollView horizontal sem altura própria
+  // vira um item flexível comum dentro da coluna da tela — quando a lista de
+  // resultados abaixo encolhe (poucos clientes no filtro), ele "rouba" esse
+  // espaço sobrando e os pills esticam verticalmente pra preencher (bug
+  // visto com o filtro "Sem endereço", que tem só 1 resultado).
+  filtersWrap: { height: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
+  filtersRow: {
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+    gap: space.xs,
+    alignItems: "center",
+  },
   filterPill: {
     paddingHorizontal: space.md,
     paddingVertical: space.xs,
