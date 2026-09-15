@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 import * as Location from "expo-location";
 
 export type LocationPermissionState =
@@ -41,7 +42,13 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
   const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
-    if (!active) {
+    // A implementação web do expo-location não tem `LocationEventEmitter.
+    // removeSubscription` — chamar `.remove()` numa subscription de
+    // `watchPositionAsync` quebra com "removeSubscription is not a function"
+    // (reproduzido ao marcar a última entrega: a rota vira COMPLETED e o
+    // hook tenta parar o GPS). Navegação com GPS contínuo nunca foi um caso
+    // de uso real na web (é tela de motorista, não de navegador) — só pula.
+    if (!active || Platform.OS === "web") {
       subscriptionRef.current?.remove();
       subscriptionRef.current = null;
       setPosition(null);
