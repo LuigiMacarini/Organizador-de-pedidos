@@ -2,11 +2,10 @@ import { prisma } from "./prismaClient.js";
 import type { CustomerSummaryRow, MonthlySummary, ProductSummaryRow } from "../../domain/report.js";
 
 /**
- * Consultas agregadas pro fechamento mensal. `groupBy` do Prisma não soma
- * `unitPrice × qty` através da relação Order→OrderLine numa chamada só, por
- * isso `$queryRaw` aqui — sempre parametrizado (datas via tagged template,
- * nunca concatenação de string), sem risco de injection. Pedidos CANCELED
- * nunca contam como faturamento (mesmo não sendo usado hoje no app).
+ * Consultas agregadas pro fechamento mensal. `$queryRaw` porque o `groupBy`
+ * do Prisma não soma `unitPrice × qty` pela relação Order→OrderLine numa
+ * chamada só — sempre parametrizado (tagged template), sem risco de
+ * injection. Pedidos CANCELED nunca contam como faturamento.
  */
 
 type SummaryRow = {

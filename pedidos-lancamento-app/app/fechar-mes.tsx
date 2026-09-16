@@ -24,7 +24,7 @@ const MONTH_NAMES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-/** "2026-09" — mesma convenção do backend (`domain/report.ts`), calculada aqui só pra navegação entre meses. */
+// Formato "2026-09", mesma convenção do backend (`domain/report.ts`).
 function monthKeyOf(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -44,7 +44,7 @@ function monthLabelOf(key: string): string {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
-/** "2026-09" -> pertence esse pedido a esse mês? (mesma noção de "mês do pedido" já usada antes: `createdAt`). */
+// Verifica se o pedido pertence ao mês, usando createdAt como "mês do pedido".
 function orderBelongsToMonth(createdAt: number, monthKey: string): boolean {
   return monthKeyOf(new Date(createdAt)) === monthKey;
 }
@@ -81,9 +81,8 @@ export default function FecharMesScreen() {
     void load(selectedMonth);
   }, [selectedMonth, load]);
 
-  // --- Seleção de CLIENTES pro "Total a receber" — puramente local, nunca
-  // chama nenhuma API de escrita. Trocar de mês (ou recarregar) reseta pra
-  // "todos selecionados", que é o ponto de partida mais útil.
+  // Seleção de clientes para "Total a receber" é só local, não chama API de
+  // escrita. Trocar de mês reseta para "todos selecionados".
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [customerSort, setCustomerSort] = useState<CustomerSort>("value");
 
@@ -115,9 +114,8 @@ export default function FecharMesScreen() {
       .reduce((sum, c) => sum + c.total, 0);
   }, [data, selectedCustomerIds]);
 
-  // --- Arquivar pedidos PENDING do mês selecionado — mesma ação que já
-  // existia, só que agora respeita o mês navegado em vez de fixar em "hoje".
-  // Seleção aqui é 100% separada da seleção de clientes acima.
+  // Arquivar pedidos PENDING do mês selecionado (antes era sempre "hoje").
+  // Seleção de pedidos aqui é separada da seleção de clientes acima.
   const monthPendingOrders = useMemo(
     () => pendingOrders.filter((o) => orderBelongsToMonth(o.createdAt, selectedMonth)),
     [pendingOrders, selectedMonth]
@@ -154,8 +152,8 @@ export default function FecharMesScreen() {
         await archiveOrder(id);
       }
       setConfirmOpen(false);
-      // Fechamento consultado de novo — pedidos recém-arquivados continuam
-      // contando no faturamento do mês (histórico não é apagado, ver §16).
+      // Recarrega o fechamento: pedidos recém-arquivados continuam contando
+      // no faturamento do mês, pois o histórico não é apagado (ver §16).
       void load(selectedMonth);
     } finally {
       setArchiving(false);

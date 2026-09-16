@@ -26,14 +26,12 @@ type UseDeliveryLocationResult = {
 };
 
 /**
- * Acompanha a posição do entregador em primeiro plano enquanto `active` for
- * true (normalmente `route.status === "IN_PROGRESS"`). Some de escutar
- * automaticamente quando `active` vira false ou o componente desmonta —
- * nunca continua coletando localização fora de uma rota ativa (plano de GPS,
- * seção 11: parar o acompanhamento ao finalizar/cancelar).
+ * Acompanha a posição do entregador em primeiro plano enquanto `active` for true
+ * (normalmente `route.status === "IN_PROGRESS"`). Para de escutar sozinho quando
+ * `active` vira false ou o componente desmonta, nunca coleta localização fora de rota ativa.
  *
- * Só primeiro plano por enquanto — segundo plano fica para uma fase futura,
- * quando o app já estiver rodando via EAS Build (não funciona no Expo Go).
+ * Só primeiro plano por enquanto; segundo plano fica pra uma fase futura via EAS Build
+ * (não funciona no Expo Go).
  */
 export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult {
   const [permission, setPermission] = useState<LocationPermissionState>("unknown");
@@ -42,12 +40,10 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
   const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
-    // A implementação web do expo-location não tem `LocationEventEmitter.
-    // removeSubscription` — chamar `.remove()` numa subscription de
-    // `watchPositionAsync` quebra com "removeSubscription is not a function"
-    // (reproduzido ao marcar a última entrega: a rota vira COMPLETED e o
-    // hook tenta parar o GPS). Navegação com GPS contínuo nunca foi um caso
-    // de uso real na web (é tela de motorista, não de navegador) — só pula.
+    // A implementação web do expo-location não tem `LocationEventEmitter.removeSubscription`:
+    // dar `.remove()` numa subscription de `watchPositionAsync` quebra ao finalizar a rota
+    // (rota vira COMPLETED e o hook tenta parar o GPS). GPS contínuo não é caso de uso real
+    // na web (é tela de motorista), então só pula aqui.
     if (!active || Platform.OS === "web") {
       subscriptionRef.current?.remove();
       subscriptionRef.current = null;
@@ -74,13 +70,10 @@ export function useDeliveryLocation(active: boolean): UseDeliveryLocationResult 
 
       subscriptionRef.current = await Location.watchPositionAsync(
         {
-          // Balanced (nível 3 de 6) é documentado como "accurate to within one
-          // hundred meters" — insuficiente pra navegação em rodovia (o carro
-          // aparecia em rua paralela). BestForNavigation é o nível que a própria
-          // expo-location descreve como pensado pra isso, usando sensores
-          // adicionais. Custa mais bateria — trade-off deliberado, documentado
-          // na conversa. timeInterval/distanceInterval não mudaram: o "pulo"
-          // visual é resolvido com suavização no mapa, não com mais polling.
+          // Balanced (~100m de precisão) não bastava pra rodovia (carro aparecia em rua
+          // paralela). BestForNavigation usa sensores extras e custa mais bateria, mas é
+          // o nível certo pra isso. O "pulo" visual do marcador é resolvido no mapa
+          // (suavização), não reduzindo o intervalo aqui.
           accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: 5000,
           distanceInterval: 15,
@@ -118,10 +111,9 @@ export type CurrentPositionResult =
   | { ok: false; reason: "services-disabled" | "denied" | "unavailable" };
 
 /**
- * Leitura pontual de GPS (não contínua, diferente de `useDeliveryLocation`)
- * — usada só na ação de iniciar uma rota, para capturar de onde o
- * entregador está saindo de verdade nesse momento. Pede permissão no
- * máximo uma vez por chamada (nunca em loop).
+ * Leitura única de GPS (diferente de `useDeliveryLocation`, que é contínua).
+ * Usada ao iniciar uma rota, pra capturar de onde o entregador está saindo de fato.
+ * Pede permissão uma vez só, sem loop.
  */
 export async function getCurrentDeliveryPosition(): Promise<CurrentPositionResult> {
   const servicesEnabled = await Location.hasServicesEnabledAsync();
@@ -131,9 +123,8 @@ export async function getCurrentDeliveryPosition(): Promise<CurrentPositionResul
   if (status !== "granted") return { ok: false, reason: "denied" };
 
   try {
-    // Leitura única — custo de bateria de usar a precisão máxima aqui é
-    // irrelevante (não é contínuo), e essa coordenada vira a origem real da
-    // rota no Google Routes, então vale a pena ser a mais precisa possível.
+    // Leitura única, então o custo de bateria da precisão máxima é irrelevante;
+    // essa coordenada vira a origem real da rota no Google Routes.
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
     return {
       ok: true,

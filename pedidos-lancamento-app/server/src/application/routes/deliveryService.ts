@@ -6,11 +6,9 @@ import { NotFoundError } from "../../domain/errors.js";
 import { toDeliveryDTO, type UpdateDeliveryStatusInput } from "../../domain/route.js";
 
 /**
- * Marca uma entrega como concluída ou falhada, sincroniza o status do
- * pedido correspondente e fecha a rota automaticamente quando não sobra
- * nenhuma entrega pendente (plano, §11). Também recalcula km/tempo
- * restantes da rota (só quando ainda sobra alguma entrega pendente — esse
- * é o único gatilho do recálculo, nunca por render/poll/GPS).
+ * Marca a entrega como concluída ou falhada, sincroniza o status do pedido e
+ * fecha a rota automaticamente quando não sobra entrega pendente (plano, §11).
+ * Recalcula km/tempo restantes só nesse caso: nunca por render, poll ou GPS.
  */
 export async function updateStatus(id: string, input: UpdateDeliveryStatusInput) {
   const existing = await deliveryRepository.findById(id);
@@ -24,7 +22,7 @@ export async function updateStatus(id: string, input: UpdateDeliveryStatusInput)
   const remaining = await deliveryRepository.listPendingByRoute(delivery.routeId);
 
   if (remaining.length === 0) {
-    // Rota terminou: nada mais "resta" — zera métricas sem chamar a Routes API de novo.
+    // Rota terminou: zera as métricas sem chamar a Routes API de novo.
     await routeRepository.setStatus(delivery.routeId, "COMPLETED", { completedAt: new Date() });
     await routeRepository.updateMetrics(delivery.routeId, {
       totalDistanceMeters: 0,
@@ -39,13 +37,11 @@ export async function updateStatus(id: string, input: UpdateDeliveryStatusInput)
 }
 
 /**
- * Sequência das paradas restantes já está decidida (vem ordenada por
- * `sequence`) — não reotimiza, só mede o trajeto: origem = posição atual do
- * entregador quando informada pelo app, senão a posição de onde a rota
- * começou (`route.startLat/Lng`, gravada ao iniciar); destino = sempre a
- * última parada restante (rota de mão única, sem depósito de retorno). Falha
- * no Google Routes não pode travar a confirmação da entrega — fica com os
- * últimos valores conhecidos (mesmo modo degradado da criação da rota).
+ * Sequência das paradas já está decidida (ordenada por sequence), então só
+ * mede o trajeto: origem é a posição atual do entregador ou, se não
+ * informada, onde a rota começou; destino é sempre a última parada restante
+ * (rota de mão única, sem volta). Falha no Google Routes não trava a
+ * confirmação da entrega, fica com os últimos valores conhecidos.
  */
 async function recalculateRemaining(
   routeId: string,
@@ -75,6 +71,6 @@ async function recalculateRemaining(
     );
     await routeRepository.updateMetrics(routeId, metrics);
   } catch {
-    // Segue com os valores antigos — ver comentário acima.
+    // Segue com os valores antigos, ver comentário acima.
   }
 }

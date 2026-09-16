@@ -41,10 +41,10 @@ export type CreateRouteData = {
 };
 
 /**
- * Cria a rota + entregas (em rascunho, sem métricas — só calculadas ao
- * iniciar, a partir do GPS real) e marca os pedidos correspondentes como
- * `RELEASED` numa única transação — evita que dois entregadores roteirizem o
- * mesmo pedido numa condição de corrida (ver plano, §17).
+ * Cria a rota + entregas em rascunho (métricas só calculadas ao iniciar) e
+ * marca os pedidos como `RELEASED` numa única transação — evita que dois
+ * entregadores roteirizem o mesmo pedido numa condição de corrida (ver
+ * plano, §17).
  */
 export function create(data: CreateRouteData) {
   return prisma.$transaction(async (tx) => {
@@ -78,9 +78,9 @@ export function setStatus(
 }
 
 /**
- * Inicia a rota: fixa a sequência otimizada das entregas (calculada a partir
- * do GPS real, ver `routeService.start`), grava métricas/geometria e marca
- * `IN_PROGRESS` — tudo numa transação para nunca deixar sequência e métricas
+ * Inicia a rota: fixa a sequência otimizada das entregas (ver
+ * `routeService.start`), grava métricas/geometria e marca `IN_PROGRESS` —
+ * tudo numa transação para nunca deixar sequência e métricas
  * dessincronizadas se algo falhar no meio.
  */
 export function start(
@@ -120,10 +120,9 @@ export function updateMetrics(
 }
 
 /**
- * Remove definitivamente rotas já encerradas (COMPLETED/CANCELED) — usado por
- * "Limpar histórico". As `Delivery`s são apagadas em cascata (`onDelete: Cascade`
- * na relação com `Route`); os `Order`s não são afetados, já com seu próprio
- * status final (DELIVERED/PENDING) independente da rota existir ou não.
+ * Remove definitivamente rotas já encerradas (COMPLETED/CANCELED) — usado
+ * por "Limpar histórico". As `Delivery`s vão em cascata; os `Order`s não são
+ * afetados, já com seu status final independente da rota existir ou não.
  */
 export function deleteFinished() {
   return prisma.route.deleteMany({ where: { status: { in: ["COMPLETED", "CANCELED"] } } });

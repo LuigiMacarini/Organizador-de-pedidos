@@ -9,21 +9,17 @@ import type { Order } from "../types";
 import { formatBRL } from "../utils/format";
 
 type Props = {
-  /** `null` = modal fechada. Mudar o id dispara um novo GET (com cache por id, dentro da sessão da tela). */
+  /** null fecha a modal; trocar o id dispara um novo GET (com cache por id na sessão). */
   orderId: string | null;
-  /** Endereço já disponível localmente (vem da entrega, não do pedido) — evita um fetch de cliente à parte. */
+  /** Endereço vem da entrega (não do pedido); evita um fetch de cliente à parte. */
   address?: string | null;
   onClose: () => void;
 };
 
 /**
- * Consulta simples do pedido de uma entrega — só leitura, nenhuma ação aqui
- * altera rota/entrega/pedido. Primeiro tenta o cache compartilhado de
- * `RoutesProvider` (pré-carregado ao iniciar a rota, funciona sem internet);
- * só cai para `GET /v1/orders/:id` em cache miss — pedido de uma rota que
- * ainda não foi iniciada, ou falha pontual no pré-carregamento. Mantém
- * também um cache local (dura enquanto a modal está montada) para não
- * repetir esse GET de fallback ao reabrir a mesma entrega na sessão.
+ * Mostra os dados do pedido de uma entrega, só leitura.
+ * Tenta primeiro o cache do RoutesProvider (pré-carregado ao iniciar a rota, funciona offline);
+ * em cache miss, busca em GET /v1/orders/:id e guarda num cache local enquanto a modal estiver aberta.
  */
 export function OrderDetailsModal({ orderId, address, onClose }: Props) {
   const { getCachedOrder } = useRoutes();

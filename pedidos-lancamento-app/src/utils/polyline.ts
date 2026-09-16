@@ -1,7 +1,6 @@
 /**
- * Decodifica uma polyline no formato padrão Google/OSRM (precisão 5, a mesma
- * usada pelo OpenRouteService). Sem dependência externa — algoritmo padrão,
- * ~20 linhas, não justifica um pacote só pra isso.
+ * Decodifica uma polyline no formato padrão Google/OSRM (precisão 5, mesma usada
+ * pelo OpenRouteService). Sem dependência externa: é só um algoritmo padrão de ~20 linhas.
  */
 export function decodePolyline(encoded: string, precision = 5): [number, number][] {
   const factor = Math.pow(10, precision);

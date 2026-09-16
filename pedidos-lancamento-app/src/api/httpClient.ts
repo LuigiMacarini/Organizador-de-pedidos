@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-/** A requisição nem chegou a ter resposta do servidor (rede/servidor fora do ar) — distinto de um erro que o servidor respondeu de propósito (ex.: senha errada). */
+/** Falha de rede/conexão, sem resposta do servidor — diferente de um erro que ele respondeu de propósito. */
 export class NetworkError extends ApiError {
   constructor() {
     super(
@@ -20,11 +20,9 @@ export class NetworkError extends ApiError {
 }
 
 /**
- * Distinto de `NetworkError`: aqui a conexão nem chegou a falhar — ela ficou
- * pendurada sem resposta além do limite de tempo. Achado da auditoria (4G em
- * movimento real): sem isso, `fetch()` pode nunca resolver nem rejeitar, e
- * qualquer `await` que dependa dele (e o `finally` que desliga o loading)
- * trava para sempre — exatamente o sintoma relatado em ENTREGUE/NÃO ENTREGUE.
+ * Distinto de `NetworkError`: aqui o `fetch` fica pendurado sem resposta até
+ * estourar o tempo limite. Sem isso ele pode nunca resolver nem rejeitar,
+ * travando pra sempre qualquer tela que dependa desse `await`.
  */
 export class TimeoutError extends ApiError {
   constructor() {
@@ -32,12 +30,7 @@ export class TimeoutError extends ApiError {
   }
 }
 
-/**
- * 15s: tempo suficiente para uma requisição real terminar mesmo em rede
- * degradada (inclui casos em que o servidor ainda está processando algo mais
- * lento, como recalcular a rota via Google Routes) sem deixar o usuário
- * esperando indefinidamente por uma conexão que já travou.
- */
+/** 15s: dá tempo pra requisição terminar mesmo em rede ruim (ex.: recalcular rota via Google Routes) sem travar o usuário indefinidamente. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /** Chamado pelo AuthProvider para reagir (redirecionar ao login) quando a sessão expira de vez. */
@@ -79,9 +72,7 @@ async function readErrorMessage(res: Response): Promise<string> {
 async function refreshAccessToken(): Promise<string | null> {
   const tokens = await loadTokens();
   if (!tokens) return null;
-  // Mesmo risco de `fetch` travar sem resposta que motivou o timeout em
-  // `doFetch` — esta chamada roda dentro da mesma cadeia (qualquer requisição
-  // autenticada que leve um 401 passa por aqui), então precisa do mesmo limite.
+  // Mesmo risco de `fetch` travar que motivou o timeout em `doFetch` — essa chamada roda no mesmo fluxo.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -112,15 +103,11 @@ type RequestOptions = {
 async function doFetch(base: string, path: string, options: RequestOptions, token: string | null) {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = {};
-  // Só envia Content-Type quando há corpo de verdade — mandá-lo em requisições
-  // sem corpo (ex.: POST /start, /cancel, /archive) faz o Fastify rejeitar com
-  // FST_ERR_CTP_EMPTY_JSON_BODY, já que promete um JSON que nunca chega.
+  // Só manda Content-Type quando há corpo — em requisições sem corpo (POST /start, /cancel...) isso faz o Fastify rejeitar com FST_ERR_CTP_EMPTY_JSON_BODY.
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  // `AbortController` é o único jeito de dar um limite de tempo ao `fetch` —
-  // sem ele, uma conexão que trava (comum em troca de torre no 4G) nunca
-  // resolve nem rejeita, e nada que depender desse `await` termina.
+  // AbortController dá um limite de tempo ao fetch — sem ele, uma conexão travada (comum em troca de torre no 4G) nunca resolve nem rejeita.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const startedAt = Date.now();
@@ -140,10 +127,7 @@ async function doFetch(base: string, path: string, options: RequestOptions, toke
       console.error(`[API] ${method} ${path} -> timeout após ${elapsedMs}ms (limite: ${REQUEST_TIMEOUT_MS}ms)`);
       throw new TimeoutError();
     }
-    // `fetch` rejeita (sem resposta HTTP nenhuma) quando o servidor está fora do ar,
-    // o endereço está errado ou não há rede — diferente de um erro que o servidor
-    // respondeu de propósito (ex.: 401 de senha errada). O Fetch API não expõe o
-    // motivo exato (DNS, recusa de conexão, TLS) — só que não houve resposta.
+    // fetch rejeita sem resposta HTTP quando o servidor está fora do ar, o endereço está errado ou não há rede.
     console.error(`[API] ${method} ${path} -> falha de rede (servidor inalcançável) após ${elapsedMs}ms`, err);
     throw new NetworkError();
   } finally {
@@ -178,10 +162,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     res = await doFetch(base, path, options, token);
   }
 
-  // O plano free do Render "dorme" o serviço após inatividade — a primeira
-  // requisição depois de um tempo parado às vezes falha (5xx) enquanto o
-  // servidor termina de acordar. Uma única tentativa extra resolve a maioria
-  // dos casos sem exigir ação do usuário.
+  // Plano free do Render "dorme" o serviço após inatividade — a primeira requisição pode falhar (5xx) enquanto ele acorda; uma retry resolve a maioria dos casos.
   if (res.status >= 500) {
     console.warn(
       `[API] ${options.method ?? "GET"} ${path} -> ${res.status}, tentando novamente em 2s (serviço pode estar acordando)`

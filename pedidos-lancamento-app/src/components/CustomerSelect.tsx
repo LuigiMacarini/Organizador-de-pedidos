@@ -164,8 +164,7 @@ const styles = StyleSheet.create({
   placeholder: { color: colors.muted, fontFamily: fonts.body },
   backdrop: {
     flex: 1,
-    // Fundo sólido (sem transparência) — foco exclusivo na seleção do cliente,
-    // sem deixar a tela anterior espiando por trás.
+    // Fundo sólido, sem transparência — foco total na seleção sem mostrar a tela de trás.
     backgroundColor: colors.bg,
     justifyContent: "flex-end",
   },

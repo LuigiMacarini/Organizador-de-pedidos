@@ -229,11 +229,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  // Só 3 opções curtas — cabem numa linha só em qualquer celular, sem
-  // precisar de ScrollView horizontal. Isso elimina de vez o problema de
-  // altura: era o ScrollView (cross-axis entre plataformas nativo/web se
-  // comporta diferente) que causava esticar/cortar em cada tentativa
-  // anterior. Uma `View` com `flexWrap` nunca tem esse tipo de bug.
+  // Só 3 opções curtas, cabem numa linha com flexWrap. Antes usava ScrollView
+  // horizontal, mas o comportamento de cross-axis divergia entre web e nativo.
   filtersRow: {
     flexDirection: "row",
     flexWrap: "wrap",

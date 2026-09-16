@@ -6,12 +6,7 @@ const ACCESS_KEY = "pedidos.accessToken";
 const REFRESH_KEY = "pedidos.refreshToken";
 const USER_KEY = "pedidos.user";
 
-/**
- * No nativo usamos o keychain/keystore criptografado (`expo-secure-store`).
- * Na web não existe equivalente — `expo-secure-store` nem funciona lá —
- * então caímos para `localStorage`. Aceitável aqui porque o app web é só
- * para desenvolvimento/demonstração; o uso real é no celular.
- */
+/** No nativo usa o keychain/keystore (`expo-secure-store`); na web cai pra `localStorage`, aceitável pois o uso real é no celular. */
 const isWeb = Platform.OS === "web";
 
 async function getItem(key: string): Promise<string | null> {
@@ -57,12 +52,7 @@ export async function saveAccessToken(accessToken: string): Promise<void> {
   await setItem(ACCESS_KEY, accessToken);
 }
 
-/**
- * Cópia local do usuário logado — só para renderizar a UI imediatamente na
- * abertura do app sem esperar rede (ver `AuthProvider`). Não é fonte de
- * verdade: `remoteMe()` sempre roda em seguida, em segundo plano, pra
- * confirmar/atualizar esses dados contra o servidor.
- */
+/** Cópia local do usuário só pra renderizar a UI na abertura sem esperar rede — `remoteMe()` confirma depois (ver `AuthProvider`). */
 export async function saveUser(user: AuthUser): Promise<void> {
   await setItem(USER_KEY, JSON.stringify(user));
 }

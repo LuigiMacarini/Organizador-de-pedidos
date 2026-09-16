@@ -10,7 +10,7 @@ type AnnounceStop = {
 
 type Coordinate = { latitude: number; longitude: number };
 
-/** Raio a partir do qual consideramos "chegando" na parada — anúncio único por parada. */
+/** Raio a partir do qual consideramos "chegando" na parada; anúncio único por parada. */
 const ARRIVAL_RADIUS_METERS = 150;
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -25,14 +25,9 @@ function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number)
 }
 
 /**
- * Navegação por voz SIMPLIFICADA: anuncia quando o entregador entra no raio
- * da próxima parada, usando só distância direta (linha reta) entre o GPS
- * atual e a coordenada do cliente. NÃO é turn-by-turn — não há manobra de
- * rua ("vire à esquerda em 200m"), nem re-roteamento por desvio. Ver
- * limitações documentadas no relatório da Etapa 4: isso exigiria casar a
- * posição do GPS com os `steps` da Routes API (map-matching), que não foi
- * implementado por ser uma solução frágil de se improvisar sem validação
- * extensa.
+ * Navegação por voz simplificada: anuncia quando o entregador entra no raio da
+ * próxima parada, usando só distância em linha reta até o cliente.
+ * Não é turn-by-turn (sem manobra de rua nem re-roteamento por desvio).
  */
 export function useNavigationAnnouncements(
   nextStop: AnnounceStop | null,

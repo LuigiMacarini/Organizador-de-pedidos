@@ -67,9 +67,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
       setCustomers(await remoteListCustomers());
     } catch (e) {
       console.error(e);
-      // Mantém a lista atual em erros pontuais (polling/refresh em segundo
-      // plano) — sumir com os dados por causa de uma falha passageira de
-      // rede seria pior do que só tentar de novo no próximo ciclo.
+      // Mantém a lista atual em erros pontuais de polling; sumir com os dados por
+      // uma falha passageira de rede é pior do que só tentar de novo no próximo ciclo.
     } finally {
       if (!opts?.silent) setLoading(false);
     }
@@ -80,9 +79,8 @@ export function CustomersProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [user, refresh]);
 
-  // MVP de sincronização entre dispositivos: sem WebSocket/webhook por
-  // enquanto, só refetch periódico (pausa em segundo plano, atualiza na
-  // hora ao voltar pro app — ver useAutoRefresh).
+  // MVP de sincronização entre dispositivos: sem WebSocket/webhook, só refetch
+  // periódico (ver useAutoRefresh).
   useAutoRefresh(() => {
     if (user) void refresh({ silent: true });
   });

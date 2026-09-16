@@ -58,9 +58,8 @@ export default function RotaDetalheScreen() {
     void load();
   }, [load]);
 
-  // Hooks precisam rodar sempre, na mesma ordem, mesmo antes de `route`
-  // existir — por isso ficam antes do retorno antecipado do loading, com
-  // acesso opcional (`route?.`) em vez de depois dele.
+  // Hooks precisam rodar sempre na mesma ordem, por isso ficam antes do
+  // retorno antecipado do loading, com acesso opcional (`route?.`).
   const canExecute = route?.status === "IN_PROGRESS";
 
   const nextStopId = useMemo(
@@ -79,8 +78,8 @@ export default function RotaDetalheScreen() {
       })),
     [route]
   );
-  // O card técnico com lat/lng/precisão foi removido da UI — o GPS continua
-  // rodando aqui só para alimentar o marcador "você está aqui" no mapa.
+  // O card técnico com lat/lng foi removido da UI; o GPS aqui só alimenta o
+  // marcador "você está aqui" no mapa.
   const { position: deliveryPosition } = useDeliveryLocation(canExecute);
 
   const nextStopForVoice = useMemo(() => {
@@ -94,8 +93,8 @@ export default function RotaDetalheScreen() {
     };
   }, [route, nextStopId]);
 
-  // Navegação por voz simplificada (ver limitações no hook) — só ativa
-  // durante uma rota em execução, igual o rastreamento contínuo de GPS.
+  // Navegação por voz (ver limitações no hook) só ativa durante rota em
+  // execução, igual o rastreamento contínuo de GPS.
   useNavigationAnnouncements(
     canExecute ? nextStopForVoice : null,
     deliveryPosition ? { latitude: deliveryPosition.latitude, longitude: deliveryPosition.longitude } : null,
@@ -115,9 +114,9 @@ export default function RotaDetalheScreen() {
   const handleStart = async () => {
     setBusy(true);
     try {
-      // Leitura pontual do GPS (distinta do rastreamento contínuo que só liga
-      // depois que a rota já está IN_PROGRESS) — vira a origem real da rota,
-      // usada pelo backend para calcular a ordem de visita e a distância/tempo.
+      // Leitura pontual do GPS, diferente do rastreamento contínuo que só liga
+      // com a rota IN_PROGRESS. Vira a origem da rota usada pelo backend para
+      // calcular a ordem de visita e a distância/tempo.
       const position = await getCurrentDeliveryPosition();
       if (!position.ok) {
         const message =
@@ -151,8 +150,8 @@ export default function RotaDetalheScreen() {
       }
     };
 
-    // Alert.alert com múltiplos botões não dispara onPress corretamente no
-    // React Native Web — mesmo problema já tratado em CustomerForm.tsx.
+    // Alert.alert com múltiplos botões não dispara onPress no React Native
+    // Web, mesmo problema já tratado em CustomerForm.tsx.
     if (Platform.OS === "web") {
       const ok = typeof window !== "undefined" && window.confirm("Cancelar rota? Os pedidos voltam para a lista de disponíveis.");
       if (ok) void run();
@@ -168,9 +167,8 @@ export default function RotaDetalheScreen() {
   const handleDeliveryStatus = async (deliveryId: string, status: "DELIVERED" | "FAILED") => {
     setBusyDeliveryId(deliveryId);
     try {
-      // Manda a posição atual do GPS (se já tiver) para o backend recalcular
-      // km/tempo restantes a partir de onde o entregador está de verdade.
-      // Sem GPS ainda, o backend cai para a posição de onde a rota começou.
+      // Manda a posição atual do GPS para o backend recalcular km/tempo
+      // restantes; sem GPS, o backend usa a posição de onde a rota começou.
       await updateDeliveryStatus(
         deliveryId,
         status,
@@ -199,9 +197,8 @@ export default function RotaDetalheScreen() {
         }}
       />
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
-        {/* Fora do ScrollView de propósito: o MapView nativo dentro de um
-            ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela
-            no React Native. Mapa fixo em cima, lista rola independente embaixo. */}
+        {/* Fora do ScrollView de propósito: MapView nativo dentro de um
+            ScrollView disputa o gesto de arrastar/pinçar com o scroll da tela. */}
         <View style={styles.mapWrap}>
           <RouteMap
             stops={mapStops}
@@ -287,7 +284,7 @@ export default function RotaDetalheScreen() {
                       : "Não entregue"}
                   </Text>
                 </View>
-                {/* Ação separada do toque no card (que abre o pedido) — evita dois
+                {/* Ação separada do toque no card (que abre o pedido), evita dois
                     comportamentos concorrentes no mesmo gesto. */}
                 <Pressable
                   onPress={() => setFocusedStopId(delivery.id)}

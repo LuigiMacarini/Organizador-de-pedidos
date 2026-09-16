@@ -36,16 +36,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Achado da auditoria de inicialização: antes, a tela ficava presa no
-   * spinner até `remoteMe()` (rede) responder — em cold start do backend
-   * (Render free tier "dormindo") isso podia demorar dezenas de segundos.
-   * `loadTokens()`/`loadUser()` são só leitura local (SecureStore), então
-   * liberamos a UI com o usuário salvo da última sessão IMEDIATAMENTE, e
-   * confirmamos com o servidor em segundo plano, sem travar nada. Só
-   * deslogamos se essa confirmação disser de verdade que a sessão não é mais
-   * válida (401 depois do próprio `apiRequest` já ter tentado renovar o
-   * token) — uma falha de rede/timeout na validação não desloga ninguém,
-   * porque não é evidência de que a sessão expirou.
+   * Libera a UI com o usuário salvo localmente (SecureStore) sem esperar
+   * rede, já que cold start do Render free tier pode levar dezenas de
+   * segundos. `remoteMe()` confirma em segundo plano; só desloga se vier
+   * 401 de verdade, nunca por falha de rede/timeout.
    */
   useEffect(() => {
     (async () => {
@@ -72,9 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           markStartup("auth_confirmed_background_session_invalid");
         } else {
-          // Rede/timeout/servidor fora do ar: mantém o usuário em cache — sem
-          // conexão não há como confirmar nada mesmo, e isso não é evidência
-          // de que a sessão expirou.
+          // Rede/timeout: mantém o usuário em cache, isso não prova que a sessão expirou.
           markStartup("auth_confirmed_background_network_error");
         }
       } finally {

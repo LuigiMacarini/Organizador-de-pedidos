@@ -57,10 +57,8 @@ export default function PedidosScreen() {
   const { customers } = useCustomers();
   const [query, setQuery] = useState("");
 
-  // `useOrders()` só traz pedidos PENDING (ainda não roteirizados) — assim
-  // que um pedido entra numa rota ele some daqui por desenho (ver
-  // ordersContext.tsx). "Sem endereço" é derivado do cliente, não do pedido
-  // em si, por isso o cruzamento com useCustomers().
+  // useOrders() só traz pedidos PENDING; um pedido roteirizado some daqui por
+  // design (ver ordersContext.tsx). "Sem endereço" vem do cliente, não do pedido.
   const geocodedCustomerIds = useMemo(
     () => new Set(customers.filter((c) => c.geocodeStatus === "OK").map((c) => c.id)),
     [customers]

@@ -3,12 +3,11 @@ import { PrismaClient } from "@prisma/client";
 const basePrisma = new PrismaClient();
 
 /**
- * O Postgres do Render (free tier) fecha conexões ociosas depois de um
- * tempo parado — a primeira query após um período de inatividade às vezes
- * cai numa conexão do pool que o Prisma ainda não percebeu que está morta,
- * e falha com `PrismaClientInitializationError: Server has closed the
- * connection`. Não é o servidor Node "acordando" (esse já respondeu antes
- * de chegar aqui) — é só essa reconexão pontual com o banco.
+ * O Postgres do Render (free tier) fecha conexões ociosas: a primeira query
+ * depois de um tempo parado pode cair numa conexão do pool que o Prisma
+ * ainda não percebeu que está morta, falhando com
+ * `PrismaClientInitializationError: Server has closed the connection`. Não é
+ * o Node "acordando" — é só essa reconexão pontual com o banco.
  */
 function isStaleConnectionError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;

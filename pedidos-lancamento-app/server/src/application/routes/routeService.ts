@@ -17,10 +17,10 @@ export async function get(id: string) {
 }
 
 /**
- * Só agrupa os pedidos escolhidos numa rota em rascunho, na ordem em que
- * foram selecionados — sem origem (não existe depósito fixo) e sem chamar a
- * Routes API: a ordem de visita e a distância/tempo só fazem sentido a partir
- * de onde o entregador realmente está, então só são calculadas em `start`.
+ * Agrupa os pedidos escolhidos numa rota em rascunho, na ordem selecionada,
+ * sem origem (não existe depósito fixo) e sem chamar a Routes API. Ordem de
+ * visita e distância/tempo só fazem sentido a partir de onde o entregador
+ * está, por isso só são calculadas em `start`.
  */
 export async function create(input: CreateRouteInput, delivererId: string) {
   const orders = await orderRepository.findManyByIds(input.orderIds);
@@ -56,22 +56,20 @@ export async function create(input: CreateRouteInput, delivererId: string) {
 }
 
 /**
- * "Null Island" (0,0) é o valor que aparece quando uma leitura de GPS falha
- * silenciosamente em algumas plataformas — nunca é uma posição real de
- * entregador. Rejeitar objetivamente isso (e não-finitos) evita usar uma
- * coordenada claramente inválida como origem, sem inventar um limiar de
- * precisão arbitrário (esse não temos como justificar sem dado real).
+ * "Null Island" (0,0) aparece quando uma leitura de GPS falha silenciosamente
+ * em algumas plataformas, nunca é uma posição real. Rejeitar isso (e valores
+ * não finitos) evita usar coordenada inválida como origem, sem inventar um
+ * limiar de precisão arbitrário.
  */
 function isPlausibleCoordinate(lat: number, lng: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
 }
 
 /**
- * A origem real da rota é a posição do GPS no momento de iniciar — não existe
- * mais depósito/local fixo. É aqui, e só aqui, que a Routes API é chamada
- * pela primeira vez: calcula a ordem eficiente de visita às paradas (partindo
- * do GPS, sem voltar — `optimizeRoute`) e grava sequência + distância/tempo/
- * geometria numa única chamada.
+ * A origem da rota é a posição do GPS no momento de iniciar, não existe mais
+ * depósito fixo. Só aqui a Routes API é chamada pela primeira vez: calcula a
+ * ordem eficiente de visita partindo do GPS sem voltar (`optimizeRoute`) e
+ * grava sequência, distância, tempo e geometria numa única chamada.
  */
 export async function start(id: string, input: StartRouteInput) {
   const route = await routeRepository.findById(id);
@@ -105,9 +103,8 @@ export async function start(id: string, input: StartRouteInput) {
       geometry: optimized.geometry,
     };
   } catch {
-    // Modo degradado (mesmo já usado no recálculo por entrega): o provedor
-    // falhou, mas isso não pode impedir o entregador de começar a trabalhar —
-    // segue com a ordem já existente (da criação) e sem métricas/geometria.
+    // Modo degradado (mesmo do recálculo por entrega): falha no provedor não
+    // pode travar o início do trabalho, segue com a ordem já existente e sem métricas.
     deliveryOrder = stops.map((s) => s.refId);
     metrics = null;
   }
@@ -127,7 +124,7 @@ export async function clearHistory() {
   return { deleted: result.count };
 }
 
-/** Exclui uma única rota já encerrada — alternativa cirúrgica ao "limpar histórico" (que apaga todas de uma vez). */
+/** Exclui uma única rota já encerrada, alternativa cirúrgica ao "limpar histórico" (que apaga todas de uma vez). */
 export async function remove(id: string) {
   const route = await get(id);
   if (route.status !== "COMPLETED" && route.status !== "CANCELED") {

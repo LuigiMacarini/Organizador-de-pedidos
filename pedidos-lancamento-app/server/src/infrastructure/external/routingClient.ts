@@ -1,9 +1,7 @@
 /**
- * Único módulo que fala HTTP com o Google Maps Platform. Nenhum outro
- * arquivo do backend deve importar `fetch` para essas APIs diretamente —
- * isso mantém a troca de provedor (se algum dia for necessária) restrita a
- * este arquivo. (Antes usava OpenRouteService — trocado por decisão
- * explícita do projeto, billing já configurado.)
+ * Único módulo que fala HTTP com o Google Maps Platform — mantém uma
+ * eventual troca de provedor restrita a este arquivo. Antes usava
+ * OpenRouteService, trocado por decisão do projeto.
  */
 
 const GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
@@ -18,10 +16,10 @@ function apiKey(): string {
 }
 
 /**
- * 10s: a própria Google documenta respostas na casa de segundos para essas
- * APIs — sem limite, uma chamada travada aqui prende a requisição HTTP
- * inteira que a chamou (o Fastify não tem `connectionTimeout` configurado),
- * incluindo confirmações de entrega que não dependem de mais nada.
+ * 10s: a Google documenta respostas na casa de segundos pra essas APIs. Sem
+ * limite, uma chamada travada prende a requisição HTTP inteira (Fastify sem
+ * `connectionTimeout` configurado), até confirmações de entrega que não
+ * dependem de mais nada.
  */
 const GOOGLE_TIMEOUT_MS = 10_000;
 
@@ -82,11 +80,10 @@ type GoogleGeocodeResponse = {
 };
 
 /**
- * Geocodifica um endereço estruturado via Geocoding API. Diferente do
- * provedor anterior (busca estruturada com filtros rígidos), a Google usa
- * texto livre com parsing tolerante — por isso montamos uma única string
- * com todos os campos, incluindo bairro (aqui não atrapalha o resultado).
- * Retorna `null` quando não encontra nada (não é erro).
+ * Geocodifica um endereço via Geocoding API. Diferente do provedor anterior,
+ * a Google usa texto livre com parsing tolerante — por isso junta todos os
+ * campos numa única string. Retorna `null` quando não encontra nada (não é
+ * erro).
  */
 export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeResult | null> {
   const address = [
@@ -184,13 +181,11 @@ async function callComputeRoutes(body: Record<string, unknown>): Promise<NonNull
 }
 
 /**
- * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` (posição
- * do entregador) — mão única, sem retorno. A Routes API exige um `destination`
- * fixo (não reordenável); por isso a última parada de `stops` é usada como
- * destino e as demais entram como `intermediates` com `optimizeWaypointOrder:
- * true` — a Google ainda decide a melhor ordem de visita entre elas, só o
- * ponto final é fixo. Não é um limiar arbitrário: é a única forma de expressar
- * "várias paradas, sem voltar ao início" nessa API.
+ * Calcula a ordem eficiente de visita a `stops`, partindo da `origin` — mão
+ * única, sem retorno. A Routes API exige um `destination` fixo, então a
+ * última parada vira destino e as demais entram como `intermediates` com
+ * `optimizeWaypointOrder: true` — é a única forma de expressar "várias
+ * paradas, sem voltar ao início" nessa API.
  */
 export async function optimizeRoute(origin: Coordinate, stops: RouteStop[]): Promise<OptimizedRoute> {
   if (stops.length === 0) {
@@ -227,12 +222,10 @@ export type RouteMetrics = {
 };
 
 /**
- * Distância/duração/geometria para uma sequência de paradas JÁ DEFINIDA, sem
- * reotimizar a ordem (`optimizeWaypointOrder: false`) — usado para recalcular
- * o restante de uma rota em andamento depois que uma entrega é concluída.
- * Reotimizar a sequência é feature futura; aqui só medimos o trajeto que já
- * está decidido. Fecha em `destination`, que o chamador decide — hoje sempre
- * a última parada restante (rota de mão única, sem depósito de retorno).
+ * Distância/duração/geometria de uma sequência de paradas JÁ DEFINIDA, sem
+ * reotimizar a ordem — usado pra recalcular o restante da rota depois que
+ * uma entrega é concluída. Reotimizar é feature futura; aqui só medimos o
+ * trajeto já decidido.
  */
 export async function computeRouteMetrics(
   origin: Coordinate,

@@ -36,16 +36,15 @@ type RoutesContextValue = {
     currentPosition?: { latitude: number; longitude: number } | null
   ) => Promise<void>;
   clearHistory: () => Promise<number>;
-  /** Pedido já pré-carregado ao iniciar a rota (ver `startRoute`) — `undefined` em cache miss, quem chama decide o fallback. */
+  /** Pedido pré-carregado ao iniciar a rota (ver `startRoute`); `undefined` em cache miss, quem chama decide o fallback. */
   getCachedOrder: (orderId: string) => Order | undefined;
 };
 
 const RoutesContext = createContext<RoutesContextValue | null>(null);
 
 /**
- * Diferente de Clientes/Pedidos, não usa `useAutoRefresh`: uma rota em
- * execução é usada ativamente por um único dispositivo, e cada ação já
- * atualiza o estado local na hora (ver plano, §8).
+ * Diferente de Clientes/Pedidos, não usa `useAutoRefresh`: uma rota em execução é
+ * usada por um único dispositivo, e cada ação já atualiza o estado local na hora.
  */
 export function RoutesProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -80,20 +79,17 @@ export function RoutesProvider({ children }: { children: React.ReactNode }) {
     return route;
   }, []);
 
-  // Cache de pedidos em memória, vivo enquanto o app estiver aberto — não
-  // precisa de biblioteca nova (React Query/Zustand/AsyncStorage), o projeto
-  // já resolve estado compartilhado com Context, e o volume de dados aqui é
-  // sempre pequeno (só os pedidos de rotas que o próprio dispositivo iniciou).
+  // Cache de pedidos em memória enquanto o app está aberto. Não precisa de lib nova
+  // (React Query, Zustand etc): o volume aqui é pequeno e o projeto já usa Context
+  // pra estado compartilhado.
   const orderCacheRef = useRef<Map<string, Order>>(new Map());
 
   const getCachedOrder = useCallback((orderId: string) => orderCacheRef.current.get(orderId), []);
 
   /**
-   * Só os pedidos DESSA rota (nunca "todos os pedidos do sistema") — buscados
-   * em paralelo e guardados no cache antes de `startRoute` devolver. Uma
-   * falha pontual num pedido não derruba o início da rota nem os demais: fica
-   * como cache miss, e `OrderDetailsModal` já sabe buscar sob demanda nesse
-   * caso (mesmo fallback de sempre, só que agora raramente precisa dele).
+   * Pré-carrega só os pedidos dessa rota, em paralelo, antes de `startRoute` devolver.
+   * Falha pontual num pedido não derruba o início da rota: fica como cache miss e
+   * `OrderDetailsModal` busca sob demanda nesse caso.
    */
   const preloadRouteOrders = useCallback(async (route: DeliveryRoute) => {
     await Promise.allSettled(

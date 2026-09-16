@@ -23,16 +23,13 @@ function stopColor(stop: MapStop, isNext: boolean): string {
 }
 
 /**
- * Mapa nativo (Google Maps via react-native-maps) dentro do próprio ORG —
- * substitui a WebView com Leaflet/OpenStreetMap usada antes. Exige dev build
- * (não funciona no Expo Go) e a chave do Maps SDK configurada em
- * app.config.js. Desenha a geometria real da rota (decodificada da polyline
- * da Google Routes API), marcadores das paradas com a próxima entrega
- * destacada, e a posição do entregador — sem origem fixa, a única origem é o
- * GPS do entregador ao iniciar a rota. Nunca sai do app.
+ * Mapa nativo (Google Maps via react-native-maps), substitui a WebView com Leaflet usada antes.
+ * Exige dev build (não funciona no Expo Go) e a chave do Maps SDK em app.config.js.
+ * Desenha a rota decodificada da polyline da Google Routes API, as paradas com a próxima
+ * entrega destacada, e a posição do entregador vinda do GPS (sem origem fixa).
  *
- * Versão só para Android/iOS (Metro resolve `.native.tsx` automaticamente
- * nessas plataformas) — react-native-maps não roda na web, ver RouteMap.web.tsx.
+ * Versão nativa: o Metro resolve .native.tsx automaticamente no Android/iOS.
+ * Ver RouteMap.web.tsx para a versão web.
  */
 export function RouteMap({
   stops,
@@ -45,8 +42,8 @@ export function RouteMap({
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
 
-  // Só recalcula quando o desenho da rota muda de verdade (rota, paradas,
-  // geometria) — nunca por causa do GPS, que só move um marcador.
+  // Só recalcula quando rota/paradas/geometria mudam de verdade, nunca por causa
+  // do GPS (que só move o marcador).
   const path = useMemo(() => {
     const decoded = geometry ? decodePolyline(geometry) : null;
     const points: [number, number][] = decoded ?? stops.map((s): [number, number] => [s.lat, s.lng]);
@@ -62,10 +59,8 @@ export function RouteMap({
     });
   }, [mapReady, path]);
 
-  // Centraliza numa entrega específica quando o entregador toca no card dela
-  // — só move a câmera (mesmo mapa, mesmos marcadores). Depende só do id
-  // selecionado, não da lista de paradas: se o status de uma entrega mudar
-  // enquanto ela está em foco, a câmera não deve pular sozinha.
+  // Centraliza a câmera na entrega tocada pelo entregador. Depende só do id focado,
+  // não da lista de paradas, pra não pular a câmera se o status mudar enquanto ela está em foco.
   useEffect(() => {
     if (!mapReady || !mapRef.current || !focusedStopId) return;
     const target = stops.find((s) => s.id === focusedStopId);
@@ -78,10 +73,9 @@ export function RouteMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedStopId, mapReady]);
 
-  // "Seguir o veículo": liga sozinho assim que a primeira posição de GPS
-  // chega (início da navegação) — não a cada atualização, só na entrada no
-  // modo. Arrastar o mapa manualmente ou focar uma parada específica desliga
-  // (o entregador tomou controle); o botão de recentralizar liga de novo.
+  // "Seguir o veículo" liga sozinho assim que chega a primeira posição de GPS.
+  // Arrastar o mapa ou focar uma parada desliga (entregador assumiu o controle);
+  // o botão de recentralizar liga de novo.
   const [following, setFollowing] = useState(false);
   const hadPositionRef = useRef(false);
 
@@ -103,13 +97,9 @@ export function RouteMap({
     );
   }, [following, currentPosition, mapReady]);
 
-  // Suavização visual do marcador do veículo: sem isso, cada atualização de
-  // GPS (a cada ~5s) faz o ícone "pular" de uma posição pra outra — em
-  // rodovia, o carro real anda 100m+ nesse intervalo. Isso só anima a
-  // TRANSIÇÃO entre duas posições reais já confirmadas pelo GPS — nunca
-  // inventa/extrapola uma posição que o GPS não relatou. Android e iOS
-  // exigem APIs diferentes do react-native-maps para animação nativa de
-  // marcador (não são intercambiáveis).
+  // Anima a transição do marcador entre duas posições reais do GPS (que chegam a cada ~5s),
+  // pra não "pular" de uma posição pra outra. Nunca extrapola posição que o GPS não relatou.
+  // Android e iOS usam APIs diferentes do react-native-maps pra essa animação.
   const vehicleMarkerRef = useRef<MapMarker>(null);
   const initialVehicleCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const animatedVehicleRegion = useRef(
@@ -130,10 +120,8 @@ export function RouteMap({
     if (Platform.OS === "android") {
       vehicleMarkerRef.current?.animateMarkerToCoordinate(coordinate, 1000);
     } else {
-      // O .d.ts pede `toValue`, mas a implementação real (lib/AnimatedRegion.js)
-      // ignora esse campo e anima cada latitude/longitude/delta individualmente
-      // a partir das próprias chaves do objeto — checado direto no fonte
-      // instalado. O cast é só pra contornar essa tipagem incompleta.
+      // O .d.ts pede toValue, mas a implementação real (AnimatedRegion.js) anima direto
+      // pelas chaves latitude/longitude/delta do objeto. O cast só contorna essa tipagem incompleta.
       animatedVehicleRegion
         .timing({
           ...coordinate,
@@ -220,8 +208,7 @@ export function RouteMap({
             </Marker>
           ) : (
             <MarkerAnimated
-              // Mesma tipagem incompleta do react-native-maps (AnimatedRegion é
-              // exatamente o tipo esperado em uso real/documentado pela lib).
+              // Mesma tipagem incompleta do react-native-maps: AnimatedRegion é o tipo certo.
               coordinate={animatedVehicleRegion as unknown as { latitude: number; longitude: number }}
               title="Você está aqui"
               anchor={{ x: 0.5, y: 0.5 }}
@@ -264,9 +251,8 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   stopMarkerText: { color: "#fff", fontWeight: "800" },
-  // Distinto de propósito dos marcadores de parada (círculo numerado) — o
-  // entregador precisa achar "onde estou" de relance, sem confundir com
-  // "onde são as entregas".
+  // Visual diferente dos marcadores de parada de propósito: o entregador precisa
+  // achar "onde estou" de relance, sem confundir com as entregas.
   vehicleMarker: {
     width: 34,
     height: 34,

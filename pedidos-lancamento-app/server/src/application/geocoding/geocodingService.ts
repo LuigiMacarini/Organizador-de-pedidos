@@ -2,19 +2,17 @@ import * as customerRepository from "../../infrastructure/db/customerRepository.
 import { geocodeAddress, type GeocodeLocationType } from "../../infrastructure/external/routingClient.js";
 
 /**
- * `ROOFTOP` = ponto exato do endereço. `RANGE_INTERPOLATED` = estimado entre
- * dois números conhecidos na mesma rua — ainda confiável o bastante (bem
- * diferente do "centro da rua inteira" que o provedor anterior devolvia
- * como fallback). `GEOMETRIC_CENTER`/`APPROXIMATE` não são específicos o
- * bastante pra ser a localização de um cliente — viram `PARTIAL`, nunca
+ * ROOFTOP é o ponto exato do endereço; RANGE_INTERPOLATED é estimado entre
+ * dois números conhecidos na mesma rua, mas ainda confiável. GEOMETRIC_CENTER
+ * e APPROXIMATE não são específicos o bastante e viram PARTIAL, nunca
  * aceitos em silêncio como endereço exato.
  */
 const PRECISE_LOCATION_TYPES = new Set<GeocodeLocationType>(["ROOFTOP", "RANGE_INTERPOLATED"]);
 
 /**
- * Geocodifica um cliente já salvo e grava o resultado. Nunca lança para o
- * chamador — falha de geocodificação não pode impedir o cadastro do cliente
- * (a geocodificação é só um pré-requisito para roteirização, não para pedidos).
+ * Geocodifica o cliente e grava o resultado. Nunca lança erro para o
+ * chamador: falha na geocodificação não pode impedir o cadastro do cliente,
+ * é pré-requisito só para roteirização, não para pedidos.
  */
 export async function geocodeCustomer(customerId: string): Promise<void> {
   const customer = await customerRepository.findById(customerId);

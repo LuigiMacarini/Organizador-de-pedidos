@@ -7,7 +7,7 @@ import { getOrderTotal } from "../../domain/order";
 
 type Props = {
   customerName: string;
-  /** Endereço já formatado (rua/número — bairro, cidade/UF) — `null` quando o cliente ainda não tem um. */
+  /** Endereço já formatado (rua/número, bairro, cidade/UF); `null` quando o cliente ainda não tem um. */
   customerAddress?: string | null;
   items: LineItem[];
 };

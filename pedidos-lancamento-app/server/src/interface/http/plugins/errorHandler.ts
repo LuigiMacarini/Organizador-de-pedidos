@@ -22,8 +22,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       const message = error.issues.map((i) => i.message).join("; ");
       return reply.status(400).send({ error: message });
     }
-    // Respeitar o statusCode do próprio Fastify em vez de sempre cair em 500
-    // genérico, que escondia a causa real (ver FST_ERR_CTP_EMPTY_JSON_BODY).
+    // Preserva o statusCode de erros do próprio Fastify em vez de cair sempre em 500 genérico.
     if (hasClientStatusCode(error)) {
       return reply.status(error.statusCode).send({ error: error.message });
     }

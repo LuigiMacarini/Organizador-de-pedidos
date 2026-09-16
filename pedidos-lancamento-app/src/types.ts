@@ -37,7 +37,7 @@ export type Order = {
   updatedAt: number;
 };
 
-/** Ver `geocodingService` no backend — PARTIAL/FAILED entram para revisão manual, nunca bloqueiam o cliente. */
+/** Ver `geocodingService` no backend: PARTIAL/FAILED entram pra revisão manual, nunca bloqueiam o cliente. */
 export type GeocodeStatus = "PENDING" | "OK" | "PARTIAL" | "FAILED";
 
 export type DeliveryStatus = "PENDING" | "DELIVERED" | "FAILED";
@@ -100,7 +100,7 @@ export type MonthlySummary = {
   orderCount: number;
   customerCount: number;
   productUnits: number;
-  /** `null` quando não houve nenhum pedido no período — não força um ticket médio de base vazia. */
+  /** `null` quando não houve nenhum pedido no período, evita ticket médio de base vazia. */
   avgTicket: number | null;
 };
 

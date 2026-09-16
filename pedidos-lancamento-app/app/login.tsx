@@ -23,13 +23,13 @@ export default function LoginScreen() {
       await login(email.trim(), password);
     } catch (e) {
       if (e instanceof NetworkError) {
-        // Não deu pra alcançar o servidor — problema de infraestrutura/rede, não de credencial.
+        // Não deu pra alcançar o servidor, é problema de rede/infra, não de credencial.
         Alert.alert(
           "Sem conexão com o servidor",
           "Verifique se o servidor está ligado, se o endereço em EXPO_PUBLIC_API_URL está certo e se o celular está na mesma rede Wi-Fi do computador que roda a API."
         );
       } else if (e instanceof ApiError) {
-        // O servidor respondeu e recusou — normalmente e-mail/senha errados (do lado do usuário).
+        // Servidor respondeu e recusou, normalmente e-mail ou senha errados.
         Alert.alert("Não foi possível entrar", e.message);
       } else {
         Alert.alert("Não foi possível entrar", "Ocorreu um erro inesperado. Tente novamente.");

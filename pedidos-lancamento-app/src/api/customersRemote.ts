@@ -18,11 +18,7 @@ export type CustomerInput = {
 
 type Page<T> = { items: T[]; nextCursor: string | null };
 
-/**
- * Traz até 200 clientes numa página só — confortável para o volume de uma
- * microempresa. Se a base crescer além disso, o próximo passo é paginar de
- * verdade na tela (a API já suporta `cursor`/`limit`).
- */
+// Página única de até 200 clientes, suficiente pro volume atual; a API já suporta paginar de verdade via cursor.
 export async function remoteListCustomers(): Promise<Customer[]> {
   const page = await apiRequest<Page<Customer>>("/v1/customers?limit=200");
   return page.items;

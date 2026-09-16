@@ -33,9 +33,9 @@ type Props = {
     items: LineItem[];
     notes: string;
   }) => Promise<void> | void;
-  /** Arquiva (não apaga) — mantém o pedido no histórico. */
+  /** Arquiva o pedido (não apaga), mantendo no histórico. */
   onArchive?: () => Promise<void> | void;
-  /** Só faz sentido na criação (sem `initial`) — "descartar e voltar" na etapa de resumo. */
+  /** Só faz sentido ao criar pedido (sem initial): "descartar e voltar" na etapa de resumo. */
   onCancel?: () => void;
   busy?: boolean;
 };
@@ -58,7 +58,7 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, onCancel,
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<LineItem[]>(initial?.items ?? []);
-  /** Só uma categoria ativa por vez — vira filtro no topo, não acordeão de seções. */
+  /** Só uma categoria ativa por vez, funciona como filtro no topo (não acordeão de seções). */
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const qtyByProduct = useMemo(() => {
@@ -69,9 +69,8 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, onCancel,
 
   const sections = useMemo(() => searchSections(query), [searchSections, query]);
 
-  // A categoria ativa some da busca atual (ex.: usuário digitou um código de
-  // outra categoria) — troca sozinho pra primeira categoria que ainda tem
-  // resultado, em vez de deixar a tela "travada" numa categoria vazia.
+  // Se a categoria ativa sumir da busca (ex: digitou código de outra categoria),
+  // troca sozinho pra primeira categoria que ainda tem resultado.
   useEffect(() => {
     if (sections.length === 0) return;
     if (!sections.some((s) => s.category === activeCategory)) {
@@ -181,10 +180,7 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, onCancel,
           style={styles.submitButton}
         />
 
-        {/* "Salvar rascunho" do design não tem hoje onde persistir (não existe
-            conceito de pedido em rascunho no backend) — em vez de fingir que
-            salva algo, só volta pra lista sem gravar. Se quiser rascunho de
-            verdade (local no aparelho, ou no servidor), é uma decisão à parte. */}
+        {/* Não existe rascunho no backend, então "descartar e voltar" só sai da tela sem salvar nada. */}
         {!initial && onCancel ? (
           <PrimaryButton
             title="Descartar e voltar"
@@ -289,8 +285,7 @@ export function OrderForm({ initial, submitLabel, onSubmit, onArchive, onCancel,
         )}
       />
 
-      {/* Fora da FlatList de propósito — fica fixa embaixo mostrando o total
-          corrente, em vez de rolar junto com os produtos. */}
+      {/* Fica fora da FlatList de propósito: barra fixa embaixo com o total, não rola junto com a lista. */}
       <View style={styles.footerBar}>
         <View>
           <Text style={styles.footerMeta}>

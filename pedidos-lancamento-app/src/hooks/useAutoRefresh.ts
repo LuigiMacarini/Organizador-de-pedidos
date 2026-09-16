@@ -4,10 +4,8 @@ import { AppState, type AppStateStatus } from "react-native";
 const DEFAULT_INTERVAL_MS = 12_000;
 
 /**
- * Repete `refresh` a cada `intervalMs` enquanto o app estiver em primeiro
- * plano — MVP de sincronização entre dispositivos via polling, sem
- * WebSocket/webhook. Pausa em segundo plano e atualiza na hora ao voltar,
- * pra não gastar rede/bateria com o app fechado.
+ * Repete `refresh` a cada `intervalMs` enquanto o app está em primeiro plano.
+ * Pausa em segundo plano e atualiza na hora ao voltar, pra não gastar rede/bateria à toa.
  */
 export function useAutoRefresh(refresh: () => void, intervalMs = DEFAULT_INTERVAL_MS) {
   const refreshRef = useRef(refresh);

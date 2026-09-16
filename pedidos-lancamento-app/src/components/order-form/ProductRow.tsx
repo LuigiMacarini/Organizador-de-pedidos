@@ -14,9 +14,8 @@ type Props = {
 };
 
 /**
- * Memoizado: com `onAdjust`/`onSetQty` estáveis (useCallback no pai) e `qty`
- * como número primitivo, cada linha só re-renderiza quando a própria
- * quantidade muda — não a lista inteira a cada tecla digitada em outro lugar.
+ * Memoizado: com `onAdjust`/`onSetQty` estáveis (useCallback no pai) e `qty` primitivo,
+ * cada linha só re-renderiza quando a própria quantidade muda.
  */
 function ProductRowBase({ product, qty, onAdjust, onSetQty }: Props) {
   const handleChangeText = useCallback(

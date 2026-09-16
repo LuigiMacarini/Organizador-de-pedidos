@@ -12,11 +12,9 @@ const STATUS_LABEL: Record<MapStop["status"], string> = {
 };
 
 /**
- * react-native-maps é nativo-only (quebra o bundle web ao ser importado).
- * Como essa tela é essencialmente uma atividade de campo — GPS, marcar
- * entrega/falha — não faz sentido reimplementar um mapa completo (Google
- * Maps JavaScript API, outra chave, outro produto) só para a versão web.
- * Aqui mostramos a mesma informação em lista, sem quebrar a build web.
+ * react-native-maps é nativo-only e quebra o bundle web.
+ * Não compensa reimplementar um mapa completo (Google Maps JS API, outra chave) só pra web,
+ * então aqui mostra a mesma informação em lista.
  */
 export function RouteMap({ stops, nextStopId, focusedStopId, height = 320 }: RouteMapProps) {
   return (

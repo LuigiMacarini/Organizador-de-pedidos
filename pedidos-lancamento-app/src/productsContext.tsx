@@ -58,9 +58,8 @@ export function ProductsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Refaz a busca sempre que o login muda — na primeira montagem os
-  // Providers sobem antes de haver sessão, então essa busca inicial falha
-  // sem token; sem depender de `user` ela nunca seria repetida após o login.
+  // Refaz a busca quando o login muda: na primeira montagem os Providers sobem antes
+  // da sessão existir, então essa busca falha sem token e precisa repetir após o login.
   useEffect(() => {
     if (!user) return;
     void refresh();

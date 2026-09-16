@@ -45,7 +45,7 @@ export function OrdersProvider({ children }: { children: React.ReactNode }) {
       setOrders(await remoteListOrders("pending"));
     } catch (e) {
       console.error(e);
-      // Mantém a lista atual em erros pontuais — ver mesma decisão em customersContext.
+      // Mantém a lista atual em erros pontuais, mesma decisão do customersContext.
     } finally {
       if (!opts?.silent) setLoading(false);
     }
@@ -56,7 +56,7 @@ export function OrdersProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [user, refresh]);
 
-  // MVP de sincronização entre dispositivos via polling — ver customersContext.
+  // MVP de sincronização entre dispositivos via polling, ver customersContext.
   useAutoRefresh(() => {
     if (user) void refresh({ silent: true });
   });

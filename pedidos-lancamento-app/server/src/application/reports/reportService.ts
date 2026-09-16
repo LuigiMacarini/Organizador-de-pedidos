@@ -9,10 +9,9 @@ import {
 } from "../../domain/report.js";
 
 /**
- * Tudo numa função só, com as consultas do mês atual e do mês anterior
- * disparadas em paralelo (`Promise.all`) — é a única chamada que a tela de
- * fechamento faz pra abrir (resumo, por cliente, por produto, comparação e
- * lista de meses disponíveis já vêm juntos).
+ * Dispara em paralelo as consultas do mês atual e do anterior (Promise.all).
+ * É a única chamada que a tela de fechamento faz: resumo, por cliente, por
+ * produto, comparação e meses disponíveis vêm todos juntos.
  */
 export async function getMonthlyClosing(monthParam?: string): Promise<MonthlyClosingDTO> {
   const key = monthParam ?? currentMonthKey();
@@ -28,8 +27,8 @@ export async function getMonthlyClosing(monthParam?: string): Promise<MonthlyClo
     reportRepository.getAvailableMonths(),
   ]);
 
-  // Sem nenhum pedido no mês anterior, não tem "mês anterior" pra comparar de
-  // verdade — mesmo que a consulta sempre devolva um objeto zerado.
+  // Sem pedido no mês anterior não há o que comparar, mesmo a consulta
+  // sempre devolvendo um objeto zerado.
   const hasPreviousData = previousSummary.orderCount > 0;
 
   return {

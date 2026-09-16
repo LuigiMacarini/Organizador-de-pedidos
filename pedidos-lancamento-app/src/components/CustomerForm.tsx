@@ -92,9 +92,7 @@ export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }:
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Busca só depois de uma pausa de digitação (debounce) e com no mínimo
-  // MIN_QUERY_LENGTH caracteres — mantém as chamadas ao Places Autocomplete
-  // sob controle em vez de disparar uma a cada tecla.
+  // Só busca com no mínimo MIN_QUERY_LENGTH caracteres, além do debounce.
   useEffect(() => {
     if (manualMode || !searchOpen) return;
     const trimmed = addressQuery.trim();
@@ -161,8 +159,7 @@ export function CustomerForm({ initial, submitLabel, onSubmit, onDelete, busy }:
   }, []);
 
   const switchToManual = useCallback(() => {
-    // Edição manual invalida a coordenada precisa vinda do Places — o
-    // backend volta a geocodificar sozinho se os campos mudarem de fato.
+    // Edição manual invalida a coordenada do Places — o backend geocodifica de novo se os campos mudarem.
     setAddress((prev) => ({ ...prev, latitude: undefined, longitude: undefined, formattedAddress: undefined }));
     setManualMode(true);
     setSearchOpen(false);

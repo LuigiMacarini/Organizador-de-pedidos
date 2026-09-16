@@ -12,7 +12,7 @@ export function groupKey(order: Pick<Order, "customerId" | "customerName">): str
   return order.customerId || `name:${order.customerName.trim().toLowerCase()}`;
 }
 
-/** A API só aceita `{ productId, qty }` — preço/nome vêm sempre do catálogo no servidor. */
+/** A API só aceita `{ productId, qty }`; preço e nome vêm sempre do catálogo no servidor. */
 export function toOrderLineInputs(items: LineItem[]): { productId: string; qty: number }[] {
   return items.map((l) => ({ productId: l.productId, qty: l.qty }));
 }

@@ -1,8 +1,7 @@
 /**
- * Paleta neutra + um único acento — sem sombras, sem gradientes, raios pequenos.
- * Objetivo: parecer uma ferramenta de trabalho (tipo sistema de balcão/PDV),
- * não um template de dashboard. Acento "aço" (#5980A6) e raios pequenos vêm da
- * refatoração de design v1 (Claude Design) aplicada a partir de 2026-09.
+ * Paleta neutra com um único acento, sem sombras nem gradientes, raios pequenos.
+ * Objetivo: parecer ferramenta de trabalho (tipo sistema de balcão/PDV), não template de dashboard.
+ * Acento "aço" (#5980A6) vem da refatoração de design v1 (Claude Design) aplicada em 2026-09.
  */
 export const colors = {
   bg: "#F6F6F7",
@@ -17,7 +16,7 @@ export const colors = {
   dangerSoft: "#F7E9E8",
 };
 
-/** Raios pequenos e consistentes — nada de cartão "pílula". */
+/** Raios pequenos e consistentes, nada de cartão "pílula". */
 export const radii = {
   sm: 4,
   md: 6,
@@ -33,12 +32,10 @@ export const space = {
 };
 
 /**
- * Barlow Condensed pros títulos/números de destaque (a "voz" do app, densa e
- * direta — bate com o tom de ferramenta de trabalho), Barlow pro corpo de
- * texto normal. Cada peso é uma família de fonte separada (Google Fonts via
- * `@expo-google-fonts`) — não dá pra combinar `fontFamily` fixo com
- * `fontWeight` variável como no sistema; por isso os nomes já dizem o peso.
- * Carregadas em `app/_layout.tsx` antes do primeiro render (ver `useFonts`).
+ * Barlow Condensed pros títulos/números de destaque, Barlow pro corpo de texto normal.
+ * Cada peso é uma família de fonte separada (Google Fonts via `@expo-google-fonts`): não dá
+ * pra combinar `fontFamily` fixo com `fontWeight` variável, por isso os nomes já dizem o peso.
+ * Carregadas em `app/_layout.tsx` antes do primeiro render.
  */
 export const fonts = {
   body: "Barlow_400Regular",

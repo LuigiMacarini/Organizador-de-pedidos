@@ -1,11 +1,8 @@
 /**
- * Instrumentação TEMPORÁRIA para medir o tempo de inicialização do app —
- * parte da auditoria de performance do TCC (ver relatório da tarefa). Só
- * marca o que é observável do lado JS; o tempo do processo nativo (antes do
- * bundle rodar) não aparece aqui — isso o Sentry já mede à parte, do lado
- * nativo, via `enableAppStartTracking` (ver app/_layout.tsx). Remover (ou
- * silenciar atrás de `__DEV__`) depois de coletar as medições do
- * experimento — não é para ficar em produção indefinidamente.
+ * Instrumentação TEMPORÁRIA pra medir o tempo de inicialização do app.
+ * Só marca o que é observável do lado JS; o tempo do processo nativo já é medido
+ * à parte pelo Sentry (`enableAppStartTracking`). Remover depois de coletar as
+ * medições, não é pra ficar em produção.
  */
 const bootTs = Date.now();
 
@@ -20,7 +17,7 @@ export function markStartup(label: string): void {
   console.log(`[startup] ${label} +${msSinceBoot}ms`);
 }
 
-/** Snapshot dos marcos já registrados nesta sessão do app — útil pra inspecionar em runtime, se necessário. */
+/** Snapshot dos marcos já registrados nesta sessão do app. */
 export function getStartupMarks(): StartupMark[] {
   return marks.slice();
 }

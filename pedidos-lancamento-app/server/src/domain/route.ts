@@ -3,10 +3,9 @@ import type { Route, Delivery, RouteStatus, DeliveryStatus, Customer } from "@pr
 import { paginationQuerySchema } from "./pagination.js";
 
 /**
- * A criação só agrupa os pedidos escolhidos numa rota em rascunho — sem
- * origem, sem chamar a Routes API. Não há depósito/local fixo da empresa: a
- * única origem que existe é o GPS do entregador, capturado ao iniciar a rota
- * (ver `startRouteInputSchema`).
+ * Só agrupa os pedidos escolhidos numa rota em rascunho, sem chamar a Routes
+ * API. Não há depósito fixo da empresa — a origem real é o GPS do
+ * entregador, capturado ao iniciar (ver `startRouteInputSchema`).
  */
 export const createRouteInputSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1, "Selecione ao menos um pedido"),
@@ -14,11 +13,7 @@ export const createRouteInputSchema = z.object({
 
 export type CreateRouteInput = z.infer<typeof createRouteInputSchema>;
 
-/**
- * A origem real da rota (de onde a distância/tempo/ordem são calculados) é a
- * posição do GPS no momento de iniciar. Por isso exigido (não opcional): não
- * dá pra iniciar uma rota sem saber de onde o entregador está saindo.
- */
+/** Obrigatório (não opcional): a origem real da rota é o GPS do entregador ao iniciar, não dá pra calcular distância/ordem sem saber de onde ele está saindo. */
 export const startRouteInputSchema = z.object({
   currentLat: z.number().finite(),
   currentLng: z.number().finite(),
@@ -29,7 +24,7 @@ export type StartRouteInput = z.infer<typeof startRouteInputSchema>;
 export const updateDeliveryStatusInputSchema = z.object({
   status: z.enum(["DELIVERED", "FAILED"]),
   notes: z.string().trim().optional(),
-  /** Posição atual do entregador (GPS), se disponível — usada para recalcular o restante da rota a partir de onde ele está de verdade, não do depósito. */
+  /** GPS atual do entregador, se disponível — recalcula o restante da rota a partir daí, não do depósito. */
   currentLat: z.number().optional(),
   currentLng: z.number().optional(),
 });

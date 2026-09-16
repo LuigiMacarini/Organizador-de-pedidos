@@ -46,11 +46,7 @@ export function monthLabel(key: string): string {
   return `${MONTH_LABELS[monthIndex]} ${year}`;
 }
 
-/**
- * `null` quando não há base de comparação válida (mês anterior sem pedidos)
- * — nunca inventa uma porcentagem enganosa (ex.: "+Infinity%" ou tratar 0
- * como se fosse uma queda de 100% partindo de uma base que não existiu).
- */
+/** `null` quando não há base de comparação (mês anterior sem pedidos) — evita porcentagem enganosa tipo "+Infinity%" ou uma queda de 100% do nada. */
 export function computeVariationPct(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return ((current - previous) / previous) * 100;

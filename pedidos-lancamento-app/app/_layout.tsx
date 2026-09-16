@@ -17,17 +17,13 @@ import type { AuthUser } from "../src/types";
 import { markStartup } from "../src/utils/startupTiming";
 
 // T1 do experimento de inicialização (ver relatório): primeiro código do app
-// a rodar depois que o bundle JS foi avaliado — o mais próximo de "JS
-// disponível" que dá pra observar sem instrumentação nativa.
+// a rodar depois do bundle JS avaliado, o mais próximo de "JS disponível"
+// que dá pra observar sem instrumentação nativa.
 markStartup("js_module_evaluated");
 
-/**
- * 100% de amostragem (tracing + profiling) — deliberado, é a janela de
- * coleta do estudo de performance do TCC (ver protocolo). Reduzir depois
- * que o experimento acabar, para não gastar quota à toa em uso normal.
- * Sem DSN (ex.: build sem a variável configurada), o SDK só fica inativo,
- * não quebra o app.
- */
+// Amostragem 100% (tracing + profiling) é proposital: é a janela de coleta
+// do estudo de performance do TCC. Reduzir depois que o experimento acabar.
+// Sem DSN configurado, o SDK fica inativo e não quebra o app.
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 1.0,
@@ -45,10 +41,10 @@ const screenOptions = {
 };
 
 /**
- * Todas as telas ficam sempre declaradas no Stack — no Expo Router v4,
- * remover uma tela condicionalmente não impede o roteador de tentar
- * resolver a URL atual para ela (quebra fora dos Providers). Em vez disso,
- * redirecionamos com base no segmento da rota atual.
+ * Todas as telas ficam sempre declaradas no Stack. No Expo Router v4, remover
+ * uma tela condicionalmente não impede o roteador de tentar resolver a URL
+ * atual para ela, o que quebra fora dos Providers. Por isso redirecionamos
+ * com base no segmento da rota atual.
  */
 function useProtectedRoute(user: AuthUser | null, loading: boolean) {
   const segments = useSegments();
@@ -69,9 +65,9 @@ function AppShell() {
   const { user, loading } = useAuth();
   useProtectedRoute(user, loading);
 
-  // T3 do experimento: quando `loading` (autenticação) vira `false` — com a
-  // renderização otimista de `AuthProvider`, isso deve acontecer quase na
-  // hora quando já existe usuário em cache local, mesmo sem rede ainda.
+  // T3 do experimento: quando `loading` (autenticação) vira `false`. Com a
+  // renderização otimista de `AuthProvider`, isso acontece quase na hora
+  // quando já existe usuário em cache local, mesmo sem rede ainda.
   useEffect(() => {
     if (!loading) markStartup("auth_resolved_ui_unblocked");
   }, [loading]);
@@ -110,7 +106,7 @@ function AppShell() {
 
 function RootLayout() {
   // T2 do experimento: primeiro render da árvore React (efeitos rodam após o
-  // commit inicial) — mede o tempo entre "JS avaliado" e "React de pé".
+  // commit inicial). Mede o tempo entre "JS avaliado" e "React de pé".
   useEffect(() => {
     markStartup("react_root_rendered");
   }, []);
@@ -128,12 +124,11 @@ function RootLayout() {
     if (fontsLoaded || fontError) markStartup("fonts_loaded");
   }, [fontsLoaded, fontError]);
 
-  // Sem fontes ainda: não renderiza nada (splash nativa segue visível
-  // sozinha até o primeiro commit) — é só um instante, carregando asset
-  // local, não é o gargalo de rede que a auditoria de inicialização
-  // resolveu em `authContext.tsx`. Sem `expo-splash-screen`: essa dependência
-  // exige um ícone de splash nativo (Android 12+) que este projeto não tem —
-  // quebrava o build sem trazer benefício real além do que este `return null` já dá.
+  // Sem fontes ainda não renderiza nada; a splash nativa segue visível até o
+  // primeiro commit. É só carregar um asset local, não o gargalo de rede já
+  // resolvido em `authContext.tsx`. Não usamos `expo-splash-screen` porque
+  // exige ícone de splash nativo (Android 12+) que o projeto não tem, e
+  // quebrava o build sem benefício real sobre este `return null`.
   if (!fontsLoaded && !fontError) return null;
 
   return (
