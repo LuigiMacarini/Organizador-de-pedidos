@@ -12,7 +12,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.example.pedidoslancamento"
+      "bundleIdentifier": "com.luigimacarini.pedidoslancamento"
     },
     "android": {
       "adaptiveIcon": {
