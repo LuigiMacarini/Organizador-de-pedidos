@@ -61,7 +61,16 @@ A auditoria leu o código do projeto, o histórico do git, o histórico de build
 - **Retenção:** spans e profiles ficam **30 dias**, por isso é preciso exportar após cada sessão de testes.
 - **Plano estudantil** (página oficial): 50K erros, 5M spans, 500 replays. Profiling de celular é **só pago à parte** (PAYG), a US$ 0,25 por *UI profile hour*. A cota de métricas customizadas não aparece na página oficial.
 
-### 2.4 Por que não usar ferramentas externas como fonte principal
+### 2.4 Dois defeitos do SDK 8.26 no Android, só revelados pela build local (29/09)
+
+O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a cota do EAS estava esgotada. A build local mostrou dois problemas que também quebrariam a build do EAS:
+
+| Problema | Causa | Correção |
+|---|---|---|
+| Build falhava em `:sentry_react-native:extractDeepLinksRelease` | O Sentry 8.26 também é um módulo Expo e declara `android.name`/`android.path` no `expo-module.config.json`. O autolinking do Expo SDK 52 (2.0.8) ignora esses campos e incluía a pasta `android/` do Sentry uma segunda vez (`:sentry-react-native`), além da inclusão feita pelo autolinking do React Native (`:sentry_react-native`) | `package.json` → `expo.autolinking.android.exclude: ["@sentry/react-native"]`. O autolinking do React Native continua incluindo o Sentry uma vez. O que sai é o `expo-handler`, que só atua no Expo SDK 53+ com a nova arquitetura (commit `cab3de9`) |
+| App fechava ao abrir: `Requiring unknown module "undefined"` em `getExpoUpdatesExports` | A integração `ExpoUpdatesListener` do Sentry tenta carregar `expo-updates` (não instalado) no evento `afterInit`, que é assíncrono. Fora do carregamento de módulos, o `guardedLoadModule` do Metro trata a falha como erro fatal antes do `try/catch` do Sentry | `Sentry.init` → `integrations` filtra `ExpoUpdatesListener` (commit `624f8aa`). A mudança é só de JS e vale para as duas plataformas. Não se sabe por que a build iOS 8 atual não cai |
+
+### 2.5 Por que não usar ferramentas externas como fonte principal
 
 `adb` (Android), `pymobiledevice3` (iOS sem Mac) e o **Flashlight** exigem o celular **ligado a um computador**. O Flashlight roda `adb shell ...` no computador e só suporta Android. Como as rotas precisam ser testadas em campo, essas ferramentas só servem em bancada. Por isso a troca do Flashlight pelo Sentry foi correta. O preço é que o Sentry mede outra família de métricas (o desempenho percebido), e CPU, RAM e FPS precisaram de instrumentação própria.
 
@@ -106,7 +115,8 @@ A auditoria leu o código do projeto, o histórico do git, o histórico de build
 - O autolinking do Expo encontrou o módulo nas duas plataformas.
 - `tsc` passou sem erros.
 - O `expo export` gerou os bundles Android e iOS, com o coletor presente nos dois.
-- Kotlin e Swift **não puderam ser compilados localmente** (não há Android SDK nem Mac). Por isso foram escritos espelhando código já compilado no projeto: `expo-speech`, `expo-location` e o Swift do próprio sentry-cocoa.
+- **Kotlin compilado e app rodando no A54 (29/09):** build local release com `:perf-sampler:compileReleaseKotlin` sem erro, app instalado e aberto sem crash, marcadores `[startup]` no logcat. Ver 4.5.
+- O **Swift ainda não foi compilado**, porque não há Mac. Foi escrito espelhando código já compilado no projeto (`expo-location` e o Swift do próprio sentry-cocoa). A primeira compilação real será a build do iOS.
 
 ### 4.2 Métricas enviadas ao Sentry
 
@@ -138,6 +148,39 @@ A auditoria leu o código do projeto, o histórico do git, o histórico de build
 ### 4.4 Como desligar depois do TCC
 
 Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também não liga) e reduza o `tracesSampleRate`. O módulo nativo pode continuar no projeto sem efeito.
+
+### 4.5 Build local do Android (Windows)
+
+É usada para validar rápido, sem gastar a cota do EAS. A build oficial do experimento continua sendo a do EAS, pelo mesmo pipeline do iOS.
+
+1. **Cópia fora do OneDrive, em caminho curto e sem acento.** O OneDrive trava arquivos e o CMake tem limite de 260 caracteres.
+   ```powershell
+   git clone "C:\Users\Luigi\OneDrive\Área de Trabalho\Projeto Org Produtos" C:\dev\org
+   cd C:\dev\org; git checkout feat/metricas-desempenho
+   copy "C:\Users\Luigi\OneDrive\Área de Trabalho\Projeto Org Produtos\pedidos-lancamento-app\.env" pedidos-lancamento-app\.env
+   cd pedidos-lancamento-app; npm ci
+   ```
+   Para atualizar depois, basta `git pull` em `C:\dev\org`.
+2. **Android SDK** em `%LOCALAPPDATA%\Android\Sdk`, com `ANDROID_HOME` e `PATH` configurados. O Google trocou o `sdkmanager` pela nova *Android CLI* (`cmdline-tools\latest\bin\android.exe`). Os IDs usam barra e é um comando por pacote:
+   ```powershell
+   android --no-metrics sdk install platforms/android-35
+   android --no-metrics sdk install build-tools/35.0.0
+   android --no-metrics sdk install cmake/3.22.1
+   android --no-metrics sdk install ndk/26.1.10909125
+   ```
+   O JDK 17 exigido pelo plugin Gradle do React Native é baixado sozinho pelo Gradle (foojay). O JDK 21 instalado serve para rodar o Gradle.
+3. **Build + instalação:**
+   ```powershell
+   $env:SENTRY_DISABLE_AUTO_UPLOAD = "true"            # não envia source maps/símbolos
+   $env:GRADLE_OPTS = "-Dorg.gradle.daemon=false"      # o daemon segura o terminal/log aberto
+   npx expo prebuild -p android                        # só na primeira vez (gera android/)
+   cd android; .\gradlew.bat app:assembleRelease -x lint -x test --build-cache
+   adb install --user 0 -r app\build\outputs\apk\release\app-release.apk
+   ```
+   - `--user 0` evita um erro de permissão com a Pasta Segura da Samsung (usuário 150).
+   - Antes da primeira instalação é preciso desinstalar o ORG do EAS, porque a assinatura é diferente.
+   - A primeira build levou ~18 min; depois de mudança só em JS, ~4,5 min.
+4. **Release no Sentry:** a build local não usa a numeração remota do EAS e aparece como `com.example.pedidoslancamento@1.0.0+1` ("1.0.0 (1)"), o mesmo rótulo da build 1 do iOS. Filtre por `os.name` ou `platform`.
 
 ---
 
@@ -185,16 +228,16 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 ## 7. Próximos passos
 
 1. **Validar com o orientador** o uso de instrumentação própria e a definição de FPS.
-2. **01/10 — piloto Android:**
-   - `npx eas-cli build --platform android --profile preview` a partir deste branch e instalar no A54.
-   - No Sentry, confirmar que chegam `perf.*` com os atributos esperados. O caminho no menu (provavelmente Explore → Metrics) será confirmado no piloto.
+2. **Piloto Android local (feito em 29/09, ver 4.5):** o app roda no A54 com a instrumentação. Falta confirmar no Sentry que as métricas `perf.*` chegam com os atributos esperados. O caminho no menu (provavelmente Explore → Metrics) será confirmado nesse passo.
+3. **01/10 — build oficial Android no EAS:**
+   - `npx eas-cli build --platform android --profile preview` a partir deste branch, já com as correções `cab3de9` e `624f8aa`, e instalar no A54 (desinstalar antes a build local).
    - Conferir a release `com.example.pedidoslancamento@1.0.0+15` com SDK 8.26.0.
-3. **Validar o instrumento uma vez, em casa:** comparar `perf.cpu` e `perf.memory.pss` com `adb shell top` e `adb shell dumpsys meminfo com.example.pedidoslancamento`.
-4. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
-5. **iOS:**
+4. **Validar o instrumento uma vez, em casa:** comparar `perf.cpu` e `perf.memory.pss` com `adb shell top` e `adb shell dumpsys meminfo com.example.pedidoslancamento`.
+5. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
+6. **iOS:**
    - Com o piloto aprovado, fazer merge no `main` e push. A pessoa do iOS gera a nova build do mesmo commit, seguindo `BUILD_IOS.md`.
    - Opcional, para reduzir risco: uma build de simulador iOS no EAS da sua conta (`"ios": { "simulator": true }`), só para confirmar que o Swift compila antes de pedir a build do TestFlight.
-6. **Exportar os dados após cada sessão**, porque a retenção é de 30 dias. A API é `GET /api/0/organizations/org-sentry/events/` com `dataset=spans` (transactions) ou `dataset=tracemetrics` (métricas; o dataset certo será confirmado no piloto), com um token `org:read`.
+7. **Exportar os dados após cada sessão**, porque a retenção é de 30 dias. A API é `GET /api/0/organizations/org-sentry/events/` com `dataset=spans` (transactions) ou `dataset=tracemetrics` (métricas; o dataset certo será confirmado no piloto), com um token `org:read`.
 
 ---
 
@@ -205,6 +248,9 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | `deec03b` | `feat: adicionar modulo nativo de metricas de desempenho` |
 | `5c002a9` | `chore: desativar profiling do Sentry` |
 | `5245415` | `feat: enviar cpu, memoria e fps para o Sentry` |
+| `5ed301c` | `docs: documentar auditoria do Sentry e metricas de desempenho do TCC` |
+| `cab3de9` | `fix: corrigir inclusao duplicada do Sentry no build Android` |
+| `624f8aa` | `fix: remover integracao do Sentry que fecha o app sem expo-updates` |
 
 ---
 
