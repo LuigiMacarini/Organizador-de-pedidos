@@ -14,6 +14,7 @@ import { ProductsProvider } from "../src/productsContext";
 import { RoutesProvider } from "../src/routesContext";
 import { colors, fonts } from "../src/theme";
 import type { AuthUser } from "../src/types";
+import { setPerfRoute, startPerfSampler } from "../src/utils/perfSampler";
 import { markStartup } from "../src/utils/startupTiming";
 
 // T1 do experimento de inicialização (ver relatório): primeiro código do app
@@ -32,6 +33,10 @@ Sentry.init({
   enableAppStartTracking: true,
   enableNativeFramesTracking: true,
 });
+
+// Coleta de CPU, memória e FPS do experimento (ver src/utils/perfSampler.ts).
+// Só liga com DSN, que é para onde as amostras vão.
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) startPerfSampler();
 
 const screenOptions = {
   headerShadowVisible: false,
@@ -62,9 +67,19 @@ function useProtectedRoute(user: AuthUser | null, loading: boolean) {
   }, [user, loading, segments, router]);
 }
 
+/** Mantém a rota atual (ex.: `/pedido/[id]`) como atributo das métricas de desempenho. */
+function usePerfRoute() {
+  const segments = useSegments();
+
+  useEffect(() => {
+    setPerfRoute(`/${segments.filter((segment) => !segment.startsWith("(")).join("/")}`);
+  }, [segments]);
+}
+
 function AppShell() {
   const { user, loading } = useAuth();
   useProtectedRoute(user, loading);
+  usePerfRoute();
 
   // T3 do experimento: quando `loading` (autenticação) vira `false`. Com a
   // renderização otimista de `AuthProvider`, isso acontece quase na hora
