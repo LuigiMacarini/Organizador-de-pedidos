@@ -32,6 +32,11 @@ Sentry.init({
   tracesSampleRate: 1.0,
   enableAppStartTracking: true,
   enableNativeFramesTracking: true,
+  // O projeto não usa expo-updates. Essa integração tenta carregá-lo depois
+  // da inicialização e, fora do carregamento de módulos, o Metro trata a falha
+  // como erro fatal: o app fechava ao abrir no Android.
+  integrations: (defaults) =>
+    defaults.filter((integration) => integration.name !== "ExpoUpdatesListener"),
 });
 
 // Coleta de CPU, memória e FPS do experimento (ver src/utils/perfSampler.ts).
