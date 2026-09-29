@@ -4,15 +4,17 @@ import PerfSampler, { type PerfSample } from "../../modules/perf-sampler";
 
 /**
  * Coletor de CPU, memória e FPS do experimento do TCC. Lê o sensor nativo
- * (`modules/perf-sampler`) a cada segundo e envia cada amostra como métrica ao
+ * (`modules/perf-sampler`) a cada 15 s e envia cada amostra como métrica ao
  * Sentry. As fórmulas ficam só aqui, iguais para Android e iOS. Métricas,
  * atributos e decisões em claude/documentacao/metricas-desempenho-tcc.md.
  */
 
-const SAMPLE_INTERVAL_MS = 1000;
-
-/** Ler a memória (PSS no Android) custa alguns ms de CPU; nas duas plataformas ela é lida a cada 5 s. */
-const MEMORY_EVERY_N_SAMPLES = 5;
+/**
+ * Coleta a cada 15 s, como no protocolo do artigo (Käld e Svensson, 2021).
+ * CPU e FPS vêm de contadores acumulados, então cada valor é a média exata dos
+ * 15 s; o maior intervalo entre quadros guarda o pior pico dentro da janela.
+ */
+const SAMPLE_INTERVAL_MS = 15_000;
 
 /** Cada lançamento do app é uma repetição do protocolo e ganha um id próprio. */
 const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -20,7 +22,6 @@ const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 
 let route = "startup";
 let timer: ReturnType<typeof setInterval> | null = null;
 let previous: PerfSample | null = null;
-let samplesTaken = 0;
 let reading = false;
 let started = false;
 /** Muda a cada pausa/retomada para descartar uma leitura que termine depois disso. */
@@ -49,8 +50,9 @@ function resume() {
   if (!PerfSampler || timer) return;
   generation++;
   previous = null;
-  samplesTaken = 0;
   PerfSampler.startFrameCounter().catch(() => undefined);
+  // Leitura imediata como ponto de partida: a primeira janela de 15 s já conta.
+  void takeSample();
   timer = setInterval(takeSample, SAMPLE_INTERVAL_MS);
 }
 
@@ -70,9 +72,7 @@ async function takeSample() {
   reading = true;
   const currentGeneration = generation;
   try {
-    const includeMemory = samplesTaken % MEMORY_EVERY_N_SAMPLES === 0;
-    samplesTaken++;
-    const sample = await PerfSampler.readSample(includeMemory);
+    const sample = await PerfSampler.readSample(true);
     if (currentGeneration === generation) record(sample);
   } catch {
     // Uma leitura com erro só perde aquela amostra.
