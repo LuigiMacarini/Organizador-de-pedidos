@@ -18,9 +18,10 @@ module.exports = () => ({
         // exposto na config resolvida. Vem de SENTRY_AUTH_TOKEN no ambiente
         // do build (EAS secret).
         //
-        // enableAndroidGradlePlugin é obrigatório: sem ele o profiling nunca
-        // liga no Android, porque o plugin do Expo não ativa o Sentry Android
-        // Gradle Plugin sozinho. "experimental" é só o nome da chave na lib.
+        // enableAndroidGradlePlugin liga o Sentry Android Gradle Plugin, que só
+        // envia símbolos e mapeamentos (o plugin do Expo deixa a instrumentação
+        // dele desligada). Não influencia o profiling, que está desligado.
+        // "experimental" é só o nome da chave na lib.
         experimental_android: {
           enableAndroidGradlePlugin: true,
         },

@@ -21,13 +21,14 @@ import { markStartup } from "../src/utils/startupTiming";
 // que dá pra observar sem instrumentação nativa.
 markStartup("js_module_evaluated");
 
-// Amostragem 100% (tracing + profiling) é proposital: é a janela de coleta
-// do estudo de performance do TCC. Reduzir depois que o experimento acabar.
-// Sem DSN configurado, o SDK fica inativo e não quebra o app.
+// Tracing em 100% é proposital: é a janela de coleta do estudo de performance
+// do TCC. Reduzir depois que o experimento acabar. Profiling fica desligado
+// porque o próprio profiler consome CPU do app e distorceria a métrica de CPU
+// (ver claude/documentacao/metricas-desempenho-tcc.md). Sem DSN configurado,
+// o SDK fica inativo e não quebra o app.
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 1.0,
-  profilesSampleRate: 1.0,
   enableAppStartTracking: true,
   enableNativeFramesTracking: true,
 });
