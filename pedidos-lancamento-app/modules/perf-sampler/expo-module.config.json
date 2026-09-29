@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["PerfSamplerModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.perfsampler.PerfSamplerModule"]
+  }
+}
