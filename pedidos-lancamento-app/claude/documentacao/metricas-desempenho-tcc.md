@@ -59,7 +59,7 @@ A auditoria leu o código do projeto, o histórico do git, o histórico de build
 - **Profiling (quando estava ligado):** um profile por transaction, com no máximo 30 s, só com Hermes.
 - **Envio:** cada transaction é enviada quando termina, pelo transporte nativo, com cache em disco se estiver offline.
 - **Retenção:** spans e profiles ficam **30 dias**, por isso é preciso exportar após cada sessão de testes.
-- **Plano estudantil** (página oficial): 50K erros, 5M spans, 500 replays. Profiling de celular é **só pago à parte** (PAYG), a US$ 0,25 por *UI profile hour*. A cota de métricas customizadas não aparece na página oficial.
+- **Plano estudantil** (página oficial): 50K erros, 5M spans, 500 replays. Profiling de celular é **só pago à parte** (PAYG), a US$ 0,25 por *UI profile hour*. A cota de métricas customizadas não aparece na página oficial, mas o plano **aceitou** as métricas `perf.*` no piloto de 29/09.
 
 ### 2.4 Dois defeitos do SDK 8.26 no Android, só revelados pela build local (29/09)
 
@@ -116,6 +116,11 @@ O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a co
 - `tsc` passou sem erros.
 - O `expo export` gerou os bundles Android e iOS, com o coletor presente nos dois.
 - **Kotlin compilado e app rodando no A54 (29/09):** build local release com `:perf-sampler:compileReleaseKotlin` sem erro, app instalado e aberto sem crash, marcadores `[startup]` no logcat. Ver 4.5.
+- **Métricas validadas no Sentry (29/09):**
+  - Onde aparecem: as `perf.*` chegam como `distribution` e ficam **ligadas ao trace da tela ativa** (Explore → Traces → abrir um trace → aba **Application Metrics**).
+  - Primeira tela, a 120 Hz: CPU de 21,6 a 46,9% de um núcleo, RSS ≈ 248 MB, `graphics` ≈ 20 MB, `perf.fps.ui` de 106 a 119.
+  - **A54 em 60 Hz confirmado:** depois de trocar Suavidade de movimentos para Padrão, `perf.fps.ui` ≈ 60.
+  - Custo do próprio instrumento: `perf.sampler.memory_read` ≈ 36 ms a cada 5 s, ≈ 0,7% de um núcleo em média.
 - O **Swift ainda não foi compilado**, porque não há Mac. Foi escrito espelhando código já compilado no projeto (`expo-location` e o Swift do próprio sentry-cocoa). A primeira compilação real será a build do iOS.
 
 ### 4.2 Métricas enviadas ao Sentry
@@ -228,7 +233,7 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 ## 7. Próximos passos
 
 1. **Validar com o orientador** o uso de instrumentação própria e a definição de FPS.
-2. **Piloto Android local (feito em 29/09, ver 4.5):** o app roda no A54 com a instrumentação. Falta confirmar no Sentry que as métricas `perf.*` chegam com os atributos esperados. O caminho no menu (provavelmente Explore → Metrics) será confirmado nesse passo.
+2. **Piloto Android local (concluído em 29/09, ver 4.1 e 4.5):** o app roda no A54, as métricas `perf.*` chegam ao Sentry e o FPS foi validado em 60 Hz.
 3. **01/10 — build oficial Android no EAS:**
    - `npx eas-cli build --platform android --profile preview` a partir deste branch, já com as correções `cab3de9` e `624f8aa`, e instalar no A54 (desinstalar antes a build local).
    - Conferir a release `com.example.pedidoslancamento@1.0.0+15` com SDK 8.26.0.
