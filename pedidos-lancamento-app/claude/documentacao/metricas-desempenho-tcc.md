@@ -187,6 +187,35 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
    - A primeira build levou ~18 min; depois de mudança só em JS, ~4,5 min.
 4. **Release no Sentry:** a build local não usa a numeração remota do EAS e aparece como `com.example.pedidoslancamento@1.0.0+1` ("1.0.0 (1)"), o mesmo rótulo da build 1 do iOS. Filtre por `os.name` ou `platform`.
 
+### 4.6 Validação do instrumento contra as ferramentas do Android (29/09)
+
+**Método (bancada):**
+- A54 no cabo, a 60 Hz, com o app na lista de Pedidos (`route = /`, `run_id = mumvvi9j-e7chk2`).
+- **CPU, 60 s** (~30 s parado + ~30 s rolando a lista): a cada 1 s, leitura de `/proc/<pid>/stat` (`utime + stime`, `CLK_TCK = 100`), a mesma fonte do `top`, com o relógio do aparelho. A leitura é feita pelo shell do adb, fora do app, então não o perturba.
+- **Memória:** 6 leituras de `dumpsys meminfo <pid>` a cada 10 s, numa fase separada, porque o `dumpsys` faz o próprio app trabalhar e contaminaria a CPU.
+- **Instrumento:** amostras `perf.*` lidas pela API do Sentry (`dataset=tracemetrics`, campo `timestamp_precise` com milissegundos), filtradas pelo `run_id`. O relógio do aparelho e o do PC diferiam só 0,4 s.
+- **Pareamento:** CPU em janelas de 5 s. Memória pela amostra do instrumento mais próxima (≤ 6 s).
+
+**Resultados:**
+
+| Métrica | Referência Android | Instrumento | Diferença |
+|---|---|---|---|
+| CPU média (64 s) | 8,7% | 8,8% | 0,1 p.p. |
+| CPU mediana / máxima | 6,4% / 28,3% | 5,8% / 30,0% | — |
+| CPU, janelas de 5 s | — | — | diferença absoluta média **0,77 p.p.**; correlação **0,86** |
+| PSS | 200,6 MB | 197,1 MB | **1,8%** |
+| Native heap | 25,2 MB | 25,1 MB | **0,3%** |
+| Graphics | 42,8 MB | 42,8 MB | **0,0%** |
+| RSS | 271,2 MB (`TOTAL RSS` do dumpsys) | 230,7 MB | 14,9%, mas **~0,7%** descontando a memória de GPU (ver abaixo) |
+| Java heap | 27,1 MB | 25,3 MB | 14,9% (dentro da oscilação do GC, ver abaixo) |
+
+**Interpretação:**
+- **RSS:** o `TOTAL RSS` do `dumpsys` **soma a memória de GPU** (`EGL mtrack` 32,6 + `GL mtrack` 8,3 = Graphics 40,9 MiB), que o RSS do kernel (`/proc/self/statm`, lido pelo instrumento) não contém. Subtraindo Graphics, a referência fica em ~229 MB contra 230,7 MB do instrumento. É diferença de definição, não erro.
+- **Java heap:** oscila com o coletor de lixo. O próprio `dumpsys` variou de 20,3 a 31,9 MiB dentro de um minuto, e a diferença média (~2 MB) está dentro dessa oscilação.
+- **Padrão em repouso:** a CPU tem picos a cada ~10–12 s, provavelmente o *polling* de 12 s do app (clientes e pedidos). Isso é relevante para a fase de repouso do protocolo.
+- **FPS** não tem referência externa com a mesma definição: o `gfxinfo` conta quadros desenhados, que é outro conceito. Ele foi validado pelo método, que é o mesmo do monitor de desempenho do React Native, e pela coerência com a taxa da tela (≈119 a 120 Hz e ≈60 a 60 Hz).
+- **Conclusão:** CPU e PSS (as métricas principais do Android) reproduzem as ferramentas do sistema, com diferença média de 0,1 p.p. na CPU e 1,8% no PSS.
+
 ---
 
 ## 5. Definições para o texto do TCC
@@ -237,7 +266,7 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 3. **01/10 — build oficial Android no EAS:**
    - `npx eas-cli build --platform android --profile preview` a partir deste branch, já com as correções `cab3de9` e `624f8aa`, e instalar no A54 (desinstalar antes a build local).
    - Conferir a release `com.example.pedidoslancamento@1.0.0+15` com SDK 8.26.0.
-4. **Validar o instrumento uma vez, em casa:** comparar `perf.cpu` e `perf.memory.pss` com `adb shell top` e `adb shell dumpsys meminfo com.example.pedidoslancamento`.
+4. **Validar o instrumento contra as ferramentas do Android:** concluído em 29/09 (ver 4.6). No iOS, a referência equivalente exigiria um Mac (Instruments), então a validação iOS fica pelo método, que usa as mesmas APIs do kernel, e pela coerência com a taxa da tela.
 5. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
 6. **iOS:**
    - Com o piloto aprovado, fazer merge no `main` e push. A pessoa do iOS gera a nova build do mesmo commit, seguindo `BUILD_IOS.md`.
@@ -256,6 +285,8 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | `5ed301c` | `docs: documentar auditoria do Sentry e metricas de desempenho do TCC` |
 | `cab3de9` | `fix: corrigir inclusao duplicada do Sentry no build Android` |
 | `624f8aa` | `fix: remover integracao do Sentry que fecha o app sem expo-updates` |
+| `daefacc` | `docs: registrar build local do Android e correcoes do Sentry 8.26` |
+| `65750e8` | `docs: registrar validacao das metricas no Android` |
 
 ---
 
