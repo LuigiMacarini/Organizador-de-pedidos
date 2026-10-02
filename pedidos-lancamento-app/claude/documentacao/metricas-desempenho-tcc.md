@@ -87,7 +87,7 @@ O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a co
 | 5 | FPS = callbacks de quadro da thread principal por segundo | É o método do monitor de desempenho do próprio React Native: `Choreographer` no Android e `CADisplayLink` no iOS |
 | 6 | Memória = métrica oficial de cada sistema, mais RSS nas duas | PSS é a métrica oficial do Android; `phys_footprint` é a que o Xcode mostra. As duas não são a mesma definição, então o RSS, que é o mesmo conceito nos dois kernels, fica como base comum |
 | 7 | Fórmulas só no JS (`src/utils/perfSampler.ts`) | O código nativo só lê contadores. A conta fica em um único lugar e é idêntica nas duas plataformas |
-| 8 | Amostragem de 1 s para CPU/FPS e de 5 s para memória, com a duração da leitura de memória registrada | Ler o PSS custa CPU do próprio app. O intervalo maior reduz a interferência, e registrar a duração torna esse custo mensurável |
+| 8 | Coleta **a cada 15 s**, com todas as métricas juntas, e a duração da leitura de memória registrada | É o protocolo do artigo (Käld e Svensson, 2021). CPU e FPS vêm de contadores acumulados, então cada valor é a média exata dos 15 s, e o maior intervalo entre quadros preserva o pico. A leitura de memória custa ~0,24% de um núcleo (36 ms a cada 15 s). Até 29/09 a coleta era de 1 s (CPU/FPS) e 5 s (memória) |
 | 9 | Coletar só em primeiro plano e enviar (`flush`) ao sair do app | Em segundo plano não há quadros. O flush evita perder o fim de cada repetição |
 | 10 | **Profiling do Sentry desligado** | O profiler consome CPU do app e contaminaria justamente a métrica de CPU (efeito do observador) |
 | 11 | Enviar como `distribution` | O SDK não agrega no cliente: cada chamada é uma amostra com timestamp, o que permite mediana e percentis |
@@ -127,15 +127,17 @@ O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a co
 
 | Métrica | Unidade | Plataforma | Definição | Frequência |
 |---|---|---|---|---|
-| `perf.cpu` | percent | ambas | Δ tempo de CPU do processo ÷ Δ tempo real × 100 (100% = um núcleo inteiro) | 1 s |
-| `perf.fps.ui` | — | ambas | Callbacks de quadro da thread principal ÷ segundos decorridos | 1 s |
-| `perf.frame.max_interval` | millisecond | ambas | Maior intervalo entre dois quadros no período (pico de travada) | 1 s |
-| `perf.memory.rss` | byte | ambas | Resident set size | 5 s |
-| `perf.memory.pss` | byte | Android | PSS total (`Debug.MemoryInfo.getTotalPss`) | 5 s |
-| `perf.memory.java_heap`, `native_heap`, `graphics` | byte | Android | Divisão do PSS (as mesmas categorias do Memory Profiler) | 5 s |
-| `perf.memory.footprint` | byte | iOS | `phys_footprint` (valor do medidor de memória do Xcode) | 5 s |
-| `perf.memory.footprint_peak` | byte | iOS | Pico de `phys_footprint` desde o início do processo (kernel) | 5 s |
-| `perf.sampler.memory_read` | millisecond | ambas | Custo da própria leitura de memória | 5 s |
+| `perf.cpu` | percent | ambas | Δ tempo de CPU do processo ÷ Δ tempo real × 100 (100% = um núcleo inteiro); média exata da janela | 15 s |
+| `perf.fps.ui` | — | ambas | Callbacks de quadro da thread principal ÷ segundos decorridos; média da janela | 15 s |
+| `perf.frame.max_interval` | millisecond | ambas | Maior intervalo entre dois quadros na janela (pico de travada) | 15 s |
+| `perf.memory.rss` | byte | ambas | Resident set size | 15 s |
+| `perf.memory.pss` | byte | Android | PSS total (`Debug.MemoryInfo.getTotalPss`) | 15 s |
+| `perf.memory.java_heap`, `native_heap`, `graphics` | byte | Android | Divisão do PSS (as mesmas categorias do Memory Profiler) | 15 s |
+| `perf.memory.footprint` | byte | iOS | `phys_footprint` (valor do medidor de memória do Xcode) | 15 s |
+| `perf.memory.footprint_peak` | byte | iOS | Pico de `phys_footprint` desde o início do processo (kernel) | 15 s |
+| `perf.sampler.memory_read` | millisecond | ambas | Custo da própria leitura de memória | 15 s |
+
+Ao abrir ou voltar ao app, uma leitura imediata serve de ponto de partida. Numa sessão de 10 min isso dá 40 amostras por métrica.
 
 ### 4.3 Atributos de cada amostra
 
@@ -215,16 +217,17 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 - **Padrão em repouso:** a CPU tem picos a cada ~10–12 s, provavelmente o *polling* de 12 s do app (clientes e pedidos). Isso é relevante para a fase de repouso do protocolo.
 - **FPS** não tem referência externa com a mesma definição: o `gfxinfo` conta quadros desenhados, que é outro conceito. Ele foi validado pelo método, que é o mesmo do monitor de desempenho do React Native, e pela coerência com a taxa da tela (≈119 a 120 Hz e ≈60 a 60 Hz).
 - **Conclusão:** CPU e PSS (as métricas principais do Android) reproduzem as ferramentas do sistema, com diferença média de 0,1 p.p. na CPU e 1,8% no PSS.
+- **Validade para 15 s:** a validação foi feita com coleta de 1 s. A coleta de 15 s usa o mesmo método (contadores acumulados), apenas com janelas maiores, então a CPU de 15 s é a média exata dos segundos validados.
 
 ---
 
 ## 5. Definições para o texto do TCC
 
-- **CPU (%):** `(tempo de CPU do processo no fim − no início) ÷ (tempo real decorrido) × 100`, medido a cada 1 s com `CLOCK_PROCESS_CPUTIME_ID`, o mesmo relógio nas duas plataformas.
+- **CPU (%):** `(tempo de CPU do processo no fim − no início) ÷ (tempo real decorrido) × 100`, medido a cada 15 s (média exata da janela) com `CLOCK_PROCESS_CPUTIME_ID`, o mesmo relógio nas duas plataformas.
   - 100% equivale a um núcleo inteiro e o valor pode passar de 100% com várias threads.
   - Para a porcentagem da capacidade total, divida por `cpu_cores`. Os núcleos dos dois aparelhos têm potências diferentes.
 - **FPS da thread principal:** número de pulsos de vsync atendidos pela thread principal por segundo (`Choreographer` / `CADisplayLink`). Cai quando a thread principal trava. Com a tela parada, fica perto da taxa de atualização.
-- **Pico de travada:** maior intervalo entre dois quadros em cada segundo.
+- **Pico de travada:** maior intervalo entre dois quadros em cada janela de 15 s.
 - **Memória:**
   - RSS nas duas plataformas (mesmo conceito);
   - PSS no Android (métrica oficial, via smaps);
@@ -242,6 +245,12 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 
 ## 6. Protocolo de coleta (checklist)
 
+**Desenho do artigo:**
+- 5 execuções por plataforma, 10 sessões no total.
+- Cada sessão dura **10 minutos com o GPS ativo** (tela de rota, `route = /rota/[id]`).
+- Coleta a cada **15 s** (Käld e Svensson, 2021), o que dá **40 amostras por métrica por sessão** e 200 por plataforma.
+- O aparelho é **reiniciado entre as execuções**, então cada sessão é um lançamento novo, com `run_id` próprio.
+
 1. **Estado inicial**
    - Bateria acima de um limite fixo e carregador desconectado.
    - Economia de energia/Pouca Energia desligada (conferir `power_save`).
@@ -249,13 +258,12 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
    - Apps em segundo plano fechados.
    - Temperatura normal (conferir `thermal_state`).
    - Rede definida.
-2. **Aquecer o backend.** O servidor está no plano gratuito do Render e hiberna após inatividade, então faça uma requisição antes de começar.
-3. **Cada repetição é um lançamento novo:** feche o app antes e anote o **horário de início**. O `run_id` de cada repetição é encontrado pelo horário da primeira amostra.
-4. **Repouso:** app aberto sem interação por um tempo fixo. O app faz polling a cada 12 s (clientes e pedidos); isso faz parte do comportamento real e deve ser citado.
-5. **Operações:** roteiro fixo e idêntico nas duas plataformas.
-6. **Fim:** volte para a tela inicial do celular, **aguarde ~5 s** para as métricas serem enviadas e só então feche o app. Anote o horário.
-7. **Bateria:** anote a % no início e no fim de cada sessão. 1% não é a mesma energia nos dois aparelhos (o A54 tem 5.000 mAh).
-8. **Repetições e duração:** definir no piloto e com o orientador.
+2. **Depois de reiniciar, aguardar ~3 min antes de abrir o app.** Logo após o boot o sistema fica ocupado (serviços, sincronizações), o que infla CPU e temperatura.
+3. **Aquecer o backend.** O servidor está no plano gratuito do Render e hiberna após inatividade, então faça uma requisição antes de começar.
+4. **Sessão:** abrir o app, iniciar a rota e anotar o **horário de início**. Manter 10 min na tela de rota com o GPS ativo. O `run_id` da sessão é encontrado pelo horário da primeira amostra.
+5. **Comportamento de fundo do app:** o app faz polling a cada 12 s (clientes e pedidos) e, na rota, o GPS atualiza a cada 5 s ou 15 m. Isso faz parte do comportamento real e deve ser citado.
+6. **Fim:** voltar para a tela inicial do celular e **aguardar ~10 s** antes de reiniciar. As métricas ficam em buffer e são enviadas nesse momento; reiniciar direto perde o fim da sessão. Anotar o horário.
+7. **Bateria:** anotar a % no início e no fim de cada sessão. 1% não é a mesma energia nos dois aparelhos (o A54 tem 5.000 mAh).
 
 ---
 
@@ -287,6 +295,8 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | `624f8aa` | `fix: remover integracao do Sentry que fecha o app sem expo-updates` |
 | `daefacc` | `docs: registrar build local do Android e correcoes do Sentry 8.26` |
 | `65750e8` | `docs: registrar validacao das metricas no Android` |
+| `fc2afce` | `docs: registrar validacao do instrumento contra o adb` |
+| `14733be` | `feat: coletar metricas de desempenho a cada 15 segundos` |
 
 ---
 
