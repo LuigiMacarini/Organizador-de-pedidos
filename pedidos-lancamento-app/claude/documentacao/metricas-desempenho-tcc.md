@@ -219,6 +219,42 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 - **Conclusão:** CPU e PSS (as métricas principais do Android) reproduzem as ferramentas do sistema, com diferença média de 0,1 p.p. na CPU e 1,8% no PSS.
 - **Validade para 15 s:** a validação foi feita com coleta de 1 s. A coleta de 15 s usa o mesmo método (contadores acumulados), apenas com janelas maiores, então a CPU de 15 s é a média exata dos segundos validados.
 
+### 4.7 Teste de sobrecarga do instrumento, A/B (06/10)
+
+**Motivação:** o orientador observou que medir dentro do próprio app pode comprometer o desempenho, o efeito do observador. O teste mede esse custo **de fora do app**.
+
+**Builds:**
+- **A:** app sem medição. É a build local **sem o DSN**, e sem DSN o Sentry fica inerte: não monta integrações nem inicializa o SDK nativo, e o coletor não liga. Para gerar a build A foi preciso limpar o cache do Metro (`%TEMP%\metro-cache`), porque ele guarda o código transformado já com as variáveis `EXPO_PUBLIC_*` embutidas e reaproveitaria a versão com DSN. Isso foi conferido no APK: o DSN estava ausente na A e presente na B.
+- **B:** a build do experimento (Sentry com tracing a 100% + coletor de 15 s).
+
+**Método:**
+- A54 no cabo, a 60 Hz.
+- Ordem contrabalançada **A B A B B A**.
+- Em cada rodada: instalação, app fechado, 30 s de pausa, abertura a frio, 60 s de estabilização na lista de Pedidos e **180 s de medição sem toque**:
+  - CPU a cada 1 s por `/proc/<pid>/stat`;
+  - RSS a cada 10 s por `/proc/<pid>/status`, ambos lidos pelo shell do adb, fora do app;
+  - PSS por `dumpsys meminfo` no fim.
+- Validade de cada rodada: ≥ 175 s medidos, mesmo PID do início ao fim e app em primeiro plano. Rodadas inválidas foram repetidas, e só a rodada 3 precisou de repetição.
+- Condições: estado térmico 0 em todas as rodadas; bateria de 66 a 69% (carregando pelo USB, igual para as duas builds).
+
+**Resultados (3 rodadas por build, média ± desvio padrão):**
+
+| Métrica | A (sem medição) | B (experimento) | B − A | t de Welch | p |
+|---|---|---|---|---|---|
+| CPU média | 11,49 ± 0,73% | 12,09 ± 0,58% | +0,60 p.p. (+5,2%) | 1,12 | 0,33 |
+| RSS médio | 242,1 ± 2,1 MB | 246,4 ± 4,7 MB | +4,2 MB (+1,7%) | 1,42 | 0,26 |
+| PSS final | 148,9 ± 9,5 MB | 147,5 ± 11,2 MB | −1,4 MB | −0,17 | 0,87 |
+
+**Interpretação:**
+- A medição dentro do app acrescentou cerca de **0,6 ponto percentual de CPU** e **4 MB de memória residente**. São diferenças do mesmo tamanho da variação natural entre rodadas e **não significativas** (p > 0,05).
+- Com 3 rodadas por build o poder estatístico é baixo. Por isso a conclusão correta é "a sobrecarga é pequena e indistinguível da variação natural", e não "a sobrecarga é zero".
+- O instrumento está presente nas builds do experimento **das duas plataformas**, então seu custo não favorece Android nem iOS na comparação.
+- A medição externa só foi possível no Android. No iOS ela exigiria macOS, e o custo é estimado pelo próprio instrumento (`perf.sampler.memory_read`).
+
+**Sugestão de texto para o TCC:** *"Para avaliar o efeito do observador, o aplicativo foi medido externamente (via adb) com e sem a instrumentação, em seis rodadas contrabalançadas (ABABBA). A instrumentação acrescentou 0,60 ponto percentual de CPU (11,49 ± 0,73% contra 12,09 ± 0,58%; t de Welch = 1,12; p = 0,33) e 4,2 MB de memória residente (p = 0,26), diferenças não significativas e da mesma ordem da variação entre rodadas."*
+
+**Lição operacional:** em três tentativas o servidor do `adb` no Windows "perdeu" o aparelho depois de ~10 min, mesmo com o USB ativo. O Windows continuava vendo a interface ADB, e reiniciar o servidor (`adb kill-server` / `start-server`) resolvia. Os scripts de bancada passaram a esperar o aparelho, repetir rodadas inválidas e reiniciar o servidor automaticamente.
+
 ---
 
 ## 5. Definições para o texto do TCC
@@ -269,11 +305,12 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 
 ## 7. Próximos passos
 
-1. **Validar com o orientador** o uso de instrumentação própria e a definição de FPS.
+1. **Devolutiva do orientador (06/10):**
+   - Aceita usar outra ferramenta além do Sentry. É a instrumentação própria, com o Sentry como canal de telemetria.
+   - Alertou para o efeito do observador. Respondido com o teste A/B (ver 4.7).
+   - Rotas: execuções **físicas** e depois **simuladas, com as mesmas rotas** (GPX gravado na rota física), para comparar o desvio padrão.
 2. **Piloto Android local (concluído em 29/09, ver 4.1 e 4.5):** o app roda no A54, as métricas `perf.*` chegam ao Sentry e o FPS foi validado em 60 Hz.
-3. **01/10 — build oficial Android no EAS:**
-   - `npx eas-cli build --platform android --profile preview` a partir deste branch, já com as correções `cab3de9` e `624f8aa`, e instalar no A54 (desinstalar antes a build local).
-   - Conferir a release `com.example.pedidoslancamento@1.0.0+15` com SDK 8.26.0.
+3. **Build `preview` do Android no EAS (disparada em 06/10, versão `1.0.0 (17)`, commit `dd231f2`):** para os testes físicos. Instalar no A54 desinstalando antes a build local, que tem outra assinatura.
 4. **Validar o instrumento contra as ferramentas do Android:** concluído em 29/09 (ver 4.6). No iOS, a referência equivalente exigiria um Mac (Instruments), então a validação iOS fica pelo método, que usa as mesmas APIs do kernel, e pela coerência com a taxa da tela.
 5. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
 6. **iOS:**
@@ -297,6 +334,7 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | `65750e8` | `docs: registrar validacao das metricas no Android` |
 | `fc2afce` | `docs: registrar validacao do instrumento contra o adb` |
 | `14733be` | `feat: coletar metricas de desempenho a cada 15 segundos` |
+| `dd231f2` | `docs: atualizar coleta para 15 segundos e protocolo do artigo` |
 
 ---
 
