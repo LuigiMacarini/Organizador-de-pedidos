@@ -230,11 +230,11 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 **Método:**
 - A54 no cabo, a 60 Hz.
 - Ordem contrabalançada **A B A B B A**.
-- Em cada rodada: instalação, app fechado, 30 s de pausa, abertura a frio, 60 s de estabilização na lista de Pedidos e **180 s de medição sem toque**:
-  - CPU a cada 1 s por `/proc/<pid>/stat`;
-  - RSS a cada 10 s por `/proc/<pid>/status`, ambos lidos pelo shell do adb, fora do app;
+- Em cada rodada: instalação, app fechado, 30 s de pausa, abertura a frio, 60 s de estabilização na lista de Pedidos e **180 amostras de CPU sem toque (~195 s)**:
+  - CPU por `/proc/<pid>/stat` a cada ~1,1 s (pausa de 1 s mais o tempo da leitura pelo adb). A média da rodada divide os ticks pelo tempo real decorrido, então o intervalo não precisa ser exato;
+  - RSS por `/proc/<pid>/status` a cada 10 amostras (~11 s), ambos lidos pelo shell do adb, fora do app;
   - PSS por `dumpsys meminfo` no fim.
-- Validade de cada rodada: ≥ 175 s medidos, mesmo PID do início ao fim e app em primeiro plano. Rodadas inválidas foram repetidas, e só a rodada 3 precisou de repetição.
+- Validade de cada rodada: ≥ 175 amostras de CPU, mesmo PID do início ao fim e app em primeiro plano. Na série final, só a rodada 3 foi repetida (a 1ª tentativa parou em 49 amostras). Duas séries anteriores, interrompidas pela perda do aparelho no adb, foram descartadas inteiras.
 - Condições: estado térmico 0 em todas as rodadas; bateria de 66 a 69% (carregando pelo USB, igual para as duas builds).
 
 **Resultados (3 rodadas por build, média ± desvio padrão):**
@@ -242,8 +242,18 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | Métrica | A (sem medição) | B (experimento) | B − A | t de Welch | p |
 |---|---|---|---|---|---|
 | CPU média | 11,49 ± 0,73% | 12,09 ± 0,58% | +0,60 p.p. (+5,2%) | 1,12 | 0,33 |
-| RSS médio | 242,1 ± 2,1 MB | 246,4 ± 4,7 MB | +4,2 MB (+1,7%) | 1,42 | 0,26 |
-| PSS final | 148,9 ± 9,5 MB | 147,5 ± 11,2 MB | −1,4 MB | −0,17 | 0,87 |
+| RSS médio | 242,1 ± 2,1 MB | 246,4 ± 4,7 MB | +4,2 MB (+1,7%) | 1,43 | 0,25 |
+| PSS final | 148,9 ± 9,5 MB | 147,5 ± 11,2 MB | −1,4 MB (−1,0%) | −0,17 | 0,87 |
+
+**Planilha com os dados e o cálculo:** [dados/teste-sobrecarga-ab.xlsx](dados/teste-sobrecarga-ab.xlsx). Ela tem cinco abas:
+- **Resumo:** a tabela acima, com fórmulas.
+- **Rodadas:** os resultados de cada rodada.
+- **CPU por amostra** e **RSS:** os dados brutos lidos pelo adb.
+- **Método:** o procedimento.
+
+Os resultados são fórmulas sobre os dados brutos, não valores colados, e por isso dá para refazer a conta no Excel ou no Google Planilhas. O p usa os graus de liberdade fracionários de Welch: `BETA.DIST(gl/(gl+t²); gl/2; 0,5; VERDADEIRO)`. A `DIST.T.BC` truncaria os graus de liberdade. O p foi conferido por integração numérica da distribuição t e bateu até a 6ª casa decimal.
+
+**Correção (06/10):** a primeira versão desta tabela trazia t = 1,42 e p = 0,26 para o RSS, porque o t foi calculado com a diferença arredondada (4,2 MB). Com o valor exato (4,23 MB) ficam t = 1,43 e p = 0,25. A conclusão não muda.
 
 **Interpretação:**
 - A medição dentro do app acrescentou cerca de **0,6 ponto percentual de CPU** e **4 MB de memória residente**. São diferenças do mesmo tamanho da variação natural entre rodadas e **não significativas** (p > 0,05).
@@ -251,7 +261,7 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 - O instrumento está presente nas builds do experimento **das duas plataformas**, então seu custo não favorece Android nem iOS na comparação.
 - A medição externa só foi possível no Android. No iOS ela exigiria macOS, e o custo é estimado pelo próprio instrumento (`perf.sampler.memory_read`).
 
-**Sugestão de texto para o TCC:** *"Para avaliar o efeito do observador, o aplicativo foi medido externamente (via adb) com e sem a instrumentação, em seis rodadas contrabalançadas (ABABBA). A instrumentação acrescentou 0,60 ponto percentual de CPU (11,49 ± 0,73% contra 12,09 ± 0,58%; t de Welch = 1,12; p = 0,33) e 4,2 MB de memória residente (p = 0,26), diferenças não significativas e da mesma ordem da variação entre rodadas."*
+**Sugestão de texto para o TCC:** *"Para avaliar o efeito do observador, o aplicativo foi medido externamente (via adb) com e sem a instrumentação, em seis rodadas contrabalançadas (ABABBA). A instrumentação acrescentou 0,60 ponto percentual de CPU (11,49 ± 0,73% contra 12,09 ± 0,58%; t de Welch = 1,12; p = 0,33) e 4,2 MB de memória residente (p = 0,25), diferenças não significativas e da mesma ordem da variação entre rodadas."*
 
 **Lição operacional:** em três tentativas o servidor do `adb` no Windows "perdeu" o aparelho depois de ~10 min, mesmo com o USB ativo. O Windows continuava vendo a interface ADB, e reiniciar o servidor (`adb kill-server` / `start-server`) resolvia. Os scripts de bancada passaram a esperar o aparelho, repetir rodadas inválidas e reiniciar o servidor automaticamente.
 
@@ -335,6 +345,7 @@ Remova a linha `startPerfSampler()` de `app/_layout.tsx` (sem DSN ele também n�
 | `fc2afce` | `docs: registrar validacao do instrumento contra o adb` |
 | `14733be` | `feat: coletar metricas de desempenho a cada 15 segundos` |
 | `dd231f2` | `docs: atualizar coleta para 15 segundos e protocolo do artigo` |
+| `689c49e` | `docs: registrar teste de sobrecarga do instrumento` |
 
 ---
 
