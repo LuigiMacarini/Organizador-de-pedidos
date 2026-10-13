@@ -338,7 +338,7 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
    - A de 06/10 (build `f7e2965d`, commit `dd231f2`) falhou pelo 3º defeito da seção 2.4.
    - A correção está no commit `1a0b450`, e a nova build ainda não foi disparada. A alternativa é usar a build local B nos testes físicos.
    - Para instalar no A54, desinstale antes a build que estiver lá, porque a assinatura é diferente.
-   - **Atenção:** a última rodada do teste A/B deixou no A54 a build A, que não mede nada. Troque antes de qualquer sessão.
+   - Em 13/10 o hash do APK instalado no A54 confirmou que ele está com a build B. As builds A e B do teste A/B ficam guardadas em `C:\dev\apks`, com o commit no nome, porque a pasta temporária do Claude não é durável.
 4. **Validar o instrumento contra as ferramentas do Android:** concluído em 29/09 (ver 4.6). No iOS, a referência equivalente exigiria um Mac (Instruments), então a validação iOS fica pelo método, que usa as mesmas APIs do kernel, e pela coerência com a taxa da tela.
 5. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
 6. **iOS:**
