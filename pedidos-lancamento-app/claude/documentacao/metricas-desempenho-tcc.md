@@ -61,14 +61,15 @@ A auditoria leu o código do projeto, o histórico do git, o histórico de build
 - **Retenção:** spans e profiles ficam **30 dias**, por isso é preciso exportar após cada sessão de testes.
 - **Plano estudantil** (página oficial): 50K erros, 5M spans, 500 replays. Profiling de celular é **só pago à parte** (PAYG), a US$ 0,25 por *UI profile hour*. A cota de métricas customizadas não aparece na página oficial, mas o plano **aceitou** as métricas `perf.*` no piloto de 29/09.
 
-### 2.4 Dois defeitos do SDK 8.26 no Android, só revelados pela build local (29/09)
+### 2.4 Três defeitos do SDK 8.26 no Android (29/09 e 06/10)
 
-O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a cota do EAS estava esgotada. A build local mostrou dois problemas que também quebrariam a build do EAS:
+O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a cota do EAS estava esgotada. A build local mostrou os dois primeiros problemas, que também quebrariam a build do EAS. O terceiro só apareceu no EAS, porque a build local roda com `SENTRY_DISABLE_AUTO_UPLOAD=true`:
 
 | Problema | Causa | Correção |
 |---|---|---|
 | Build falhava em `:sentry_react-native:extractDeepLinksRelease` | O Sentry 8.26 também é um módulo Expo e declara `android.name`/`android.path` no `expo-module.config.json`. O autolinking do Expo SDK 52 (2.0.8) ignora esses campos e incluía a pasta `android/` do Sentry uma segunda vez (`:sentry-react-native`), além da inclusão feita pelo autolinking do React Native (`:sentry_react-native`) | `package.json` → `expo.autolinking.android.exclude: ["@sentry/react-native"]`. O autolinking do React Native continua incluindo o Sentry uma vez. O que sai é o `expo-handler`, que só atua no Expo SDK 53+ com a nova arquitetura (commit `cab3de9`) |
 | App fechava ao abrir: `Requiring unknown module "undefined"` em `getExpoUpdatesExports` | A integração `ExpoUpdatesListener` do Sentry tenta carregar `expo-updates` (não instalado) no evento `afterInit`, que é assíncrono. Fora do carregamento de módulos, o `guardedLoadModule` do Metro trata a falha como erro fatal antes do `try/catch` do Sentry | `Sentry.init` → `integrations` filtra `ExpoUpdatesListener` (commit `624f8aa`). A mudança é só de JS e vale para as duas plataformas. Não se sabe por que a build iOS 8 atual não cai |
+| Build `preview` do EAS falhou (06/10) com `Could not create task ':app:uploadSentryNativeSymbolsForRelease'` / `SentryCliExecTask.setIgnoreExitValue(boolean)` | O plugin Expo do Sentry 8.26 fixa o Sentry Android Gradle Plugin em **6.21.0**, incompatível com o **Gradle 8.10.2** do Expo SDK 52. O plugin só quebra quando o envio automático de símbolos está ligado (`shouldSentryAutoUpload()`), o que acontece no EAS e não na build local. A falha foi reproduzida com `gradlew app:assembleRelease --dry-run` em `C:\dev\org`: quebra sem a variável e passa com ela | `eas.json` → perfil `preview` com `env.SENTRY_DISABLE_AUTO_UPLOAD = "true"` (commit `1a0b450`). O EAS só deixa de enviar source maps e símbolos ao Sentry. O app e as métricas não mudam, e a configuração fica igual à da build local B validada (4.6 e 4.7) |
 
 ### 2.5 Por que não usar ferramentas externas como fonte principal
 
@@ -265,6 +266,19 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
 
 **Lição operacional:** em três tentativas o servidor do `adb` no Windows "perdeu" o aparelho depois de ~10 min, mesmo com o USB ativo. O Windows continuava vendo a interface ADB, e reiniciar o servidor (`adb kill-server` / `start-server`) resolvia. Os scripts de bancada passaram a esperar o aparelho, repetir rodadas inválidas e reiniciar o servidor automaticamente.
 
+### 4.8 Builds no EAS (06/10 e 13/10)
+
+| Perfil | Para quê | Configuração |
+|---|---|---|
+| `preview` | APK do Android para os testes físicos | `env.SENTRY_DISABLE_AUTO_UPLOAD = "true"`, que contorna o 3º defeito da seção 2.4. É a mesma configuração da build local B |
+| `ios-simulator` | Compilar o Swift do coletor nos Macs do EAS, sem conta Apple, antes de pedir a build do TestFlight. **Não instala no iPhone**: o app gerado só roda no Simulador do Xcode | Herda o `preview`, usa o ambiente `preview` do EAS (DSN, URL da API, chaves do Maps) e `ios.simulator = true` |
+
+**Build de simulador (13/10, build `553c764f`, commit `1a0b450`, ~8 min): concluída.**
+- **Antes de disparar:** o autolinking do Expo foi conferido no Windows com `npx expo-modules-autolinking resolve --platform ios`. Ele inclui o pod `PerfSampler` e registra o `PerfSamplerModule`. Isso exclui o risco de a build passar sem compilar o coletor, já que o `expo-module.config.json` usa a chave antiga `ios` em vez de `apple`.
+- **No log:** o pod `PerfSampler` foi instalado e o `PerfSamplerModule.swift` foi compilado para arm64 e x86_64, sem avisos nem erros no arquivo. As APIs usadas (`task_info`, `clock_gettime_nsec_np`, `CADisplayLink`, `ProcessInfo`) são as mesmas no SDK do aparelho.
+- **O que ela não valida:** o funcionamento no iPhone. Isso será conferido no Sentry depois da build do TestFlight, com as métricas `perf.*` chegando com `platform = ios`.
+- **Numeração:** foi a primeira build iOS deste projeto no EAS, e o número de build remoto começou em 1. A build do TestFlight é feita na conta da outra pessoa, com numeração própria.
+
 ---
 
 ## 5. Definições para o texto do TCC
@@ -320,12 +334,18 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
    - Alertou para o efeito do observador. Respondido com o teste A/B (ver 4.7).
    - Rotas: execuções **físicas** e depois **simuladas, com as mesmas rotas** (GPX gravado na rota física), para comparar o desvio padrão.
 2. **Piloto Android local (concluído em 29/09, ver 4.1 e 4.5):** o app roda no A54, as métricas `perf.*` chegam ao Sentry e o FPS foi validado em 60 Hz.
-3. **Build `preview` do Android no EAS (disparada em 06/10, versão `1.0.0 (17)`, commit `dd231f2`):** para os testes físicos. Instalar no A54 desinstalando antes a build local, que tem outra assinatura.
+3. **Build `preview` do Android no EAS:**
+   - A de 06/10 (build `f7e2965d`, commit `dd231f2`) falhou pelo 3º defeito da seção 2.4.
+   - A correção está no commit `1a0b450`, e a nova build ainda não foi disparada. A alternativa é usar a build local B nos testes físicos.
+   - Para instalar no A54, desinstale antes a build que estiver lá, porque a assinatura é diferente.
+   - **Atenção:** a última rodada do teste A/B deixou no A54 a build A, que não mede nada. Troque antes de qualquer sessão.
 4. **Validar o instrumento contra as ferramentas do Android:** concluído em 29/09 (ver 4.6). No iOS, a referência equivalente exigiria um Mac (Instruments), então a validação iOS fica pelo método, que usa as mesmas APIs do kernel, e pela coerência com a taxa da tela.
 5. **Plano B:** se o plano estudantil não aceitar métricas customizadas, enviar os valores como atributos de spans, que já chegam ao Sentry.
 6. **iOS:**
-   - Com o piloto aprovado, fazer merge no `main` e push. A pessoa do iOS gera a nova build do mesmo commit, seguindo `BUILD_IOS.md`.
-   - Opcional, para reduzir risco: uma build de simulador iOS no EAS da sua conta (`"ios": { "simulator": true }`), só para confirmar que o Swift compila antes de pedir a build do TestFlight.
+   - **Precisa de uma build nova.** A build atual do iPhone (TestFlight, feita do `main` 0397d3c) não tem o coletor e roda com profiling a 100% (`profilesSampleRate: 1.0`), um custo que só o iPhone pagaria.
+   - A build de simulador foi concluída em 13/10 e o Swift compila (ver 4.8).
+   - **Próximo passo:** deixar o código acessível à pessoa do iOS, com merge no `main` e push ou com a build feita direto do branch. Ela gera a build do TestFlight seguindo `BUILD_IOS.md`. Qualquer commit a partir de `14733be` tem o mesmo código de app da build B do Android.
+   - Depois, conferir no Sentry as métricas `perf.*` com `platform = ios`, e desligar o Modo de Pouca Energia nas sessões. A tela do iPhone 16 é de 60 Hz, como o A54 configurado.
 7. **Exportar os dados após cada sessão**, porque a retenção é de 30 dias. A API é `GET /api/0/organizations/org-sentry/events/` com `dataset=spans` (transactions) ou `dataset=tracemetrics` (métricas; o dataset certo será confirmado no piloto), com um token `org:read`.
 
 ---
@@ -346,6 +366,8 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
 | `14733be` | `feat: coletar metricas de desempenho a cada 15 segundos` |
 | `dd231f2` | `docs: atualizar coleta para 15 segundos e protocolo do artigo` |
 | `689c49e` | `docs: registrar teste de sobrecarga do instrumento` |
+| `61d44b2` | `docs: exportar planilha do teste de sobrecarga` |
+| `1a0b450` | `fix: corrigir build preview do EAS e adicionar perfil de simulador iOS` |
 
 ---
 
