@@ -1,0 +1,72 @@
+﻿Applications Memory Usage (in Kilobytes):
+Uptime: 605485182 Realtime: 929253499
+
+** MEMINFO in pid 20175 [com.example.pedidoslancamento] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap    33331    33312        0       34    34660    45996    34429     7276
+  Dalvik Heap    14655    14420       92       68    16248    31842     7266    24576
+ Dalvik Other     1466     1424        0        0     2084                           
+        Stack     1536     1536        0        0     1540                           
+       Ashmem        8        0        0        0      552                           
+    Other dev       24        0       24        0      368                           
+     .so mmap     3684      172       60       18    39992                           
+    .jar mmap     1741        0      216        0    35552                           
+    .apk mmap    15052     1088    11320        0    20844                           
+    .ttf mmap      620        0      504        0      904                           
+    .dex mmap    25515       52    25420        0    26352                           
+    .oat mmap      470        0       12        0    12372                           
+    .art mmap     6741     6360       60       99    22464                           
+   Other mmap      225        4       52        0     1460                           
+   EGL mtrack    13354    13354        0        0    13354                           
+    GL mtrack     4836     4836        0        0     4836                           
+      Unknown    15477    15272      192        5    16180                           
+        TOTAL   138959    91830    37952      224   249762    77838    41695    31852
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    20840                          38712
+         Native Heap:    33312                          34660
+                Code:    38844                         136096
+               Stack:     1536                           1540
+            Graphics:    18190                          18190
+       Private Other:    17060
+              System:     9177
+             Unknown:                                   20564
+ 
+           TOTAL PSS:   138959            TOTAL RSS:   249762       TOTAL SWAP PSS:      224
+ 
+ Objects
+               Views:      140         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       37        AssetManagers:        0
+       Local Binders:       23        Proxy Binders:       69
+       Parcel memory:       15         Parcel count:       52
+    Death Recipients:        1             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+   Bitmap (malloced):       10                             24
+    Other (malloced):     1096                            103
+ Other (nonmalloced):      101                             75
+ 
+ SQL
+         MEMORY_USED:      254
+  PAGECACHE_OVERFLOW:       66          MALLOC_SIZE:       46
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b) cache hits cache misses cache size  Dbname
+PER CONNECTION STATS
+         4       96            123     7    45     9  /data/user/0/com.example.pedidoslancamento/no_backup/androidx.work.workdb
+         4        8                    0     0     0    (attached) temp
+         4       96             25     2    14     2  /data/user/0/com.example.pedidoslancamento/no_backup/androidx.work.workdb (2)
+POOL STATS
+     cache hits  cache misses    cache size  Dbname
+              9            63            11  /data/user/0/com.example.pedidoslancamento/no_backup/androidx.work.workdb
+ 
+ Asset Allocations
+    : 3848K
+ 

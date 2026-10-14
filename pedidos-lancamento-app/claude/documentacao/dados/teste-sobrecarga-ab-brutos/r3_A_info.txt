@@ -1,0 +1,1 @@
+﻿rodada=3 build=A pid=17905 inicio=1791327875.198175444 foco=[topResumedActivity=ActivityRecord{84590357 u0 com.example.pedidoslancamento/.MainActivity t9557}] termico=[Thermal Status: 0] bateria=[level: 67]

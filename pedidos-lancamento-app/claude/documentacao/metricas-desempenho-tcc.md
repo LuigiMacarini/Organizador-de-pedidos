@@ -122,7 +122,8 @@ O upgrade para o SDK 8.26.0 nunca tinha sido compilado para Android, porque a co
   - Primeira tela, a 120 Hz: CPU de 21,6 a 46,9% de um núcleo, RSS ≈ 248 MB, `graphics` ≈ 20 MB, `perf.fps.ui` de 106 a 119.
   - **A54 em 60 Hz confirmado:** depois de trocar Suavidade de movimentos para Padrão, `perf.fps.ui` ≈ 60.
   - Custo do próprio instrumento: `perf.sampler.memory_read` ≈ 36 ms a cada 5 s, ≈ 0,7% de um núcleo em média.
-- O **Swift ainda não foi compilado**, porque não há Mac. Foi escrito espelhando código já compilado no projeto (`expo-location` e o Swift do próprio sentry-cocoa). A primeira compilação real será a build do iOS.
+- O **Swift** foi escrito sem Mac, espelhando código já compilado no projeto (`expo-location` e o Swift do próprio sentry-cocoa). A primeira compilação foi em 13/10, na build de simulador do EAS, sem avisos nem erros (ver 4.8).
+- **Scripts de coleta e análise** (exportação do Sentry, planilhas, roteiro pelo adb e bancada): [scripts/README.md](scripts/README.md). Eles rodam no PC e não entram na build.
 
 ### 4.2 Métricas enviadas ao Sentry
 
@@ -406,7 +407,10 @@ Cada planilha tem três abas:
    - A build de simulador foi concluída em 13/10 e o Swift compila (ver 4.8).
    - **Próximo passo:** deixar o código acessível à pessoa do iOS, com merge no `main` e push ou com a build feita direto do branch. Ela gera a build do TestFlight seguindo `BUILD_IOS.md`. Qualquer commit a partir de `14733be` tem o mesmo código de app da build B do Android.
    - Depois, conferir no Sentry as métricas `perf.*` com `platform = ios`, e desligar o Modo de Pouca Energia nas sessões. A tela do iPhone 16 é de 60 Hz, como o A54 configurado.
-7. **Exportar os dados após cada sessão**, porque a retenção é de 30 dias. A API é `GET /api/0/organizations/org-sentry/events/` com `dataset=spans` (transactions) ou `dataset=tracemetrics` (métricas; o dataset certo será confirmado no piloto), com um token `org:read`.
+7. **Exportar os dados no dia de cada sessão**, porque a retenção é de 30 dias.
+   - Use `scripts/sentry/exportar-execucao.js`, com recorte pelos horários da sessão, e `scripts/planilhas/gerar-planilha-sessao.js`. O passo a passo está em [scripts/README.md](scripts/README.md).
+   - A API é `GET /api/0/organizations/org-sentry/events/` com `dataset=tracemetrics`, confirmado nas conferências de 13/10, e um token só de leitura.
+   - Atributos numéricos e booleanos exigem a sintaxe tipada (ver 4.9).
 
 ---
 
@@ -428,6 +432,9 @@ Cada planilha tem três abas:
 | `689c49e` | `docs: registrar teste de sobrecarga do instrumento` |
 | `61d44b2` | `docs: exportar planilha do teste de sobrecarga` |
 | `1a0b450` | `fix: corrigir build preview do EAS e adicionar perfil de simulador iOS` |
+| `1498805` | `docs: registrar falha do EAS no Android e build de simulador iOS` |
+| `331ddb7` | `docs: corrigir build instalada no A54` |
+| `9bbbbe3` | `docs: registrar conferencia manual e automatica no Android` |
 
 ---
 
