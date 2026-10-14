@@ -1,0 +1,2 @@
+# O bash do Git Bash não aceita final de linha CRLF: os .sh ficam sempre com LF.
+*.sh text eol=lf
