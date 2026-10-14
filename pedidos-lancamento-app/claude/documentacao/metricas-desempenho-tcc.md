@@ -279,6 +279,63 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
 - **O que ela não valida:** o funcionamento no iPhone. Isso será conferido no Sentry depois da build do TestFlight, com as métricas `perf.*` chegando com `platform = ios`.
 - **Numeração:** foi a primeira build iOS deste projeto no EAS, e o número de build remoto começou em 1. A build do TestFlight é feita na conta da outra pessoa, com numeração própria.
 
+### 4.9 Conferência manual e automática no Android (13/10)
+
+**Objetivo:** usar o app como no dia a dia (cadastro, pedido e rota) e conferir o que o coletor registra em cada tela. **Não é dado do TCC**, porque a bateria estava em 12 a 16% e carregando no cabo.
+
+| | Manual | Automática (adb) |
+|---|---|---|
+| Execução (`run_id`) | `mv7by2b5-kd6k9d` | `mv7d5c56-apbu5r` |
+| Horário | 20:46:45–20:54:47 | 21:20:24–21:28:45 |
+| Leituras de CPU | 32 | 34 |
+| Planilha | [dados/conferencia-manual-android-2026-10-13.xlsx](dados/conferencia-manual-android-2026-10-13.xlsx) | [dados/conferencia-automatica-android-2026-10-13.xlsx](dados/conferencia-automatica-android-2026-10-13.xlsx) |
+
+**Roteiro:**
+1. Lista de Pedidos parada (45 s) e rolando (30 s).
+2. Clientes rolando (30 s).
+3. Novo cliente.
+4. Novo pedido.
+5. Nova rota.
+6. Iniciar a rota: 30 s mexendo no mapa e ~2,5 min parado.
+7. Limpeza.
+
+Diferenças da execução automática:
+- O cliente novo foi preenchido e descartado, porque um cliente com pedidos não pode ser excluído. O pedido usou o cliente "Teste Tcc", que já existia.
+- A navegação achou os botões por leituras de tela (`uiautomator dump`). Elas custam um pouco de CPU ao app nos momentos de navegação, mas não nas fases paradas.
+
+Cada planilha tem três abas:
+- **Resumo por tela:** média, máximo e mínimo de cada métrica, com fórmulas.
+- **Leituras:** uma linha a cada 15 s.
+- **Dados brutos:** o que veio da API do Sentry.
+
+**Resultados:**
+
+| Tela da rota parada, com GPS | Manual | Automática |
+|---|---|---|
+| CPU | 5,4–8,4% (≈ 7,3%) | 7,1–9,7% (≈ 8,1%) |
+| FPS | 60,0 | 60,0 |
+| Pior intervalo entre quadros | 17–24 ms | 17–30 ms |
+| PSS | 258–292 MB | 262–292 MB |
+
+- **Abertura do app:** pior intervalo de ~500 ms nas duas execuções (500 e 516 ms). A tela da rota usa ~100 MB a mais que a lista, por causa do mapa.
+- **Interação:** mexer no mapa custou ~45–50% de CPU, e rolar listas, ~35–45%.
+- **Telas com interação variam com o ritmo de quem usa.** Por exemplo, a tela de Clientes deu 46% na manual e 34% na automática. Por isso a comparação entre plataformas usa a tela da rota em regime (seção 6), que se repetiu nas duas execuções.
+
+**Achados para o protocolo:**
+- **Duas pausas curtas ao iniciar a rota (só no Android):**
+  - O app chama `Location.requestForegroundPermissionsAsync()` duas vezes: em `getCurrentDeliveryPosition` (posição de partida) e em `useDeliveryLocation` (rastreamento contínuo).
+  - No Android, cada chamada abre a tela de permissão do sistema (`GrantPermissionsActivity`) mesmo com a permissão já concedida. Ela fecha em 0,1 a 0,2 s, invisível, mas tira o app do primeiro plano. O log do Android confirmou: 21:24:41 e 21:24:44. O padrão se repetiu nas duas execuções.
+  - O coletor pausa e descarta a janela em andamento, como previsto.
+  - O código do experimento não muda. Nas sessões, os 10 minutos contam a partir de alguns segundos depois de "Iniciar rota".
+  - Melhoria possível para depois do TCC: consultar a permissão (`getForegroundPermissionsAsync`) antes de pedir.
+- **O `run_id` marca o processo do app, não a sessão.** Se o app volta do segundo plano sem reiniciar, o coletor continua no mesmo `run_id`. Isso aconteceu na conferência manual: o mapeamento de telas da execução automática entrou nela até 21:11. O protocolo já reinicia o aparelho entre as sessões, e a análise recorta cada sessão também pelo horário.
+- **Exportação:** na API do Sentry, atributos numéricos e booleanos exigem a sintaxe tipada (`tags[refresh_rate_hz,number]`, `tags[cpu_cores,number]`, `tags[power_save,boolean]`). Sem ela, vêm vazios. Os valores estavam corretos: 60 Hz, 8 núcleos, economia de energia desligada e estado térmico `none` (normal no Android). As amostras levam de 1 a 2 min para aparecer na API.
+
+**Incidentes da execução automática:**
+- **A primeira tentativa (21:12) parou no passo 5.** O script montava o caminho da pasta no formato do Git Bash (`/tmp/...`), que o Node do Windows não abre quando a conversão de caminhos está desligada, e nenhum botão era achado. Ela foi interrompida antes de salvar qualquer coisa.
+- **A segunda parou com segurança no arquivamento.** O primeiro toque numa lista filtrada só fecha o teclado, que é o comportamento padrão de listas do React Native. O pedido de teste foi arquivado em seguida, conferindo tela a tela.
+- **O que ficou nos dados reais:** as rotas de teste aparecem canceladas no histórico, e o cliente "Teste Tcc" não pode ser excluído porque tem pedidos.
+
 ---
 
 ## 5. Definições para o texto do TCC
@@ -320,7 +377,10 @@ Os resultados são fórmulas sobre os dados brutos, não valores colados, e por 
    - Rede definida.
 2. **Depois de reiniciar, aguardar ~3 min antes de abrir o app.** Logo após o boot o sistema fica ocupado (serviços, sincronizações), o que infla CPU e temperatura.
 3. **Aquecer o backend.** O servidor está no plano gratuito do Render e hiberna após inatividade, então faça uma requisição antes de começar.
-4. **Sessão:** abrir o app, iniciar a rota e anotar o **horário de início**. Manter 10 min na tela de rota com o GPS ativo. O `run_id` da sessão é encontrado pelo horário da primeira amostra.
+4. **Sessão:** abrir o app e iniciar a rota.
+   - Anotar o **horário de início** alguns segundos depois de "Iniciar rota", porque no Android o início da rota causa duas pausas curtas do coletor (ver 4.9).
+   - Manter 10 min na tela de rota com o GPS ativo.
+   - O `run_id` da sessão é encontrado pelo horário da primeira amostra. A análise recorta a sessão pelos horários de início e fim.
 5. **Comportamento de fundo do app:** o app faz polling a cada 12 s (clientes e pedidos) e, na rota, o GPS atualiza a cada 5 s ou 15 m. Isso faz parte do comportamento real e deve ser citado.
 6. **Fim:** voltar para a tela inicial do celular e **aguardar ~10 s** antes de reiniciar. As métricas ficam em buffer e são enviadas nesse momento; reiniciar direto perde o fim da sessão. Anotar o horário.
 7. **Bateria:** anotar a % no início e no fim de cada sessão. 1% não é a mesma energia nos dois aparelhos (o A54 tem 5.000 mAh).
